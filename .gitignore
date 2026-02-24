@@ -1,0 +1,23 @@
+# Build artifacts
+zotextract.xpi
+*.zip
+manifest.json.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (if test tooling is added later)
+node_modules/
+npm-debug.log*
+
+# Logs
+*.log

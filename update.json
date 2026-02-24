@@ -1,0 +1,17 @@
+{
+  "addons": {
+    "zotextract@nfdixcs.org": {
+      "updates": [
+        {
+          "version": "0.1.0",
+          "update_link": "https://github.com/SamyAteia/ZotExtract/releases/download/v0.1.0/zotextract.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

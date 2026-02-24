@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZotExtract – LLM-based Information Extraction for Zotero</title>
+    <meta name="description" content="A Zotero plugin for LLM-based information extraction from PDFs. Developed within the NFDIxCS project.">
+    <meta property="og:title" content="ZotExtract – LLM-based Information Extraction for Zotero">
+    <meta property="og:description" content="Automatically pull structured metadata and key concepts from full-text PDFs using local or online LLMs.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://zotextract.nfdixcs.org">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #1a2744;
+            --color-accent: #2563eb;
+            --color-accent-hover: #1d4ed8;
+            --color-bg: #f8fafc;
+            --color-surface: #ffffff;
+            --color-text: #1e293b;
+            --color-text-muted: #64748b;
+            --color-border: #e2e8f0;
+            --color-nfdixcs-blue: #003056;
+            --radius: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+            --max-width: 1120px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--color-text);
+            background: var(--color-bg);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ---- NAV ---- */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .nav-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-brand {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--color-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-brand svg { width: 28px; height: 28px; }
+        .nav-links { display: flex; gap: 28px; align-items: center; }
+        .nav-links a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        .nav-links a:hover { color: var(--color-accent); }
+
+        /* ---- HERO ---- */
+        .hero {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 80px 24px 64px;
+            text-align: center;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: #eef2ff;
+            color: var(--color-accent);
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            border: 1px solid #cbd5ff;
+        }
+        .hero h1 {
+            font-size: clamp(2.4rem, 5vw, 3.6rem);
+            font-weight: 700;
+            line-height: 1.15;
+            color: var(--color-primary);
+            margin-bottom: 20px;
+        }
+        .hero h1 span { color: var(--color-accent); }
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--color-text-muted);
+            max-width: 640px;
+            margin: 0 auto 36px;
+        }
+        .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: var(--color-accent);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+        }
+        .btn-primary:hover { background: var(--color-accent-hover); transform: translateY(-1px); }
+        .btn-secondary {
+            background: var(--color-surface);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+        }
+        .btn-secondary:hover { border-color: var(--color-accent); color: var(--color-accent); }
+        .btn svg { width: 18px; height: 18px; }
+
+        /* ---- FEATURES ---- */
+        .features {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 64px 24px 80px;
+        }
+        .features h2 {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 12px;
+        }
+        .features > p {
+            text-align: center;
+            color: var(--color-text-muted);
+            max-width: 560px;
+            margin: 0 auto 48px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        .feature-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            padding: 28px;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .feature-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 1.4rem;
+        }
+        .feature-icon.blue   { background: #eef2ff; color: #2563eb; }
+        .feature-icon.green  { background: #ecfdf5; color: #059669; }
+        .feature-icon.purple { background: #f3e8ff; color: #7c3aed; }
+        .feature-icon.orange { background: #fff7ed; color: #ea580c; }
+        .feature-icon.teal   { background: #f0fdfa; color: #0d9488; }
+        .feature-icon.rose   { background: #fff1f2; color: #e11d48; }
+        .feature-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 8px; }
+        .feature-card p  { font-size: 0.9rem; color: var(--color-text-muted); line-height: 1.55; }
+
+        /* ---- QUICKSTART ---- */
+        .quickstart {
+            background: var(--color-primary);
+            color: #fff;
+            padding: 72px 24px;
+        }
+        .quickstart-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        .quickstart h2 { font-size: 1.8rem; margin-bottom: 12px; }
+        .quickstart > .quickstart-inner > p { color: #94a3b8; margin-bottom: 40px; }
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+        }
+        .step {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius);
+            padding: 24px;
+        }
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: var(--color-accent);
+            color: #fff;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+        }
+        .step h3 { font-size: 1rem; margin-bottom: 6px; }
+        .step p  { font-size: 0.88rem; color: #94a3b8; line-height: 1.5; }
+        .step code {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.82rem;
+        }
+
+        /* ---- PROVIDERS ---- */
+        .providers {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 72px 24px;
+            text-align: center;
+        }
+        .providers h2 { font-size: 1.8rem; font-weight: 700; color: var(--color-primary); margin-bottom: 12px; }
+        .providers > p { color: var(--color-text-muted); max-width: 520px; margin: 0 auto 40px; }
+        .provider-list {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .provider-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.92rem;
+            color: var(--color-text);
+        }
+        .provider-tag .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .provider-tag .dot.green  { background: #22c55e; }
+        .provider-tag .dot.blue   { background: #3b82f6; }
+        .provider-tag .dot.purple { background: #8b5cf6; }
+        .provider-tag .dot.orange { background: #f97316; }
+
+        /* ---- FUNDING ---- */
+        .funding {
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            padding: 72px 24px;
+        }
+        .funding-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            text-align: center;
+        }
+        .funding-inner h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 16px;
+        }
+        .funding-inner > p {
+            color: var(--color-text-muted);
+            max-width: 640px;
+            margin: 0 auto 32px;
+            font-size: 1.02rem;
+            line-height: 1.65;
+        }
+        .funding-logo {
+            display: block;
+            margin: 0 auto 28px;
+            max-width: 320px;
+        }
+        .funding-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+            margin-top: 28px;
+        }
+        .funding-links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--color-accent);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .funding-links a:hover { text-decoration: underline; }
+        .funding-links a svg { width: 16px; height: 16px; }
+        .funding-orgs {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 32px;
+            font-size: 0.88rem;
+            color: var(--color-text-muted);
+        }
+        .funding-orgs a { color: var(--color-text-muted); text-decoration: underline; }
+        .funding-orgs a:hover { color: var(--color-accent); }
+
+        /* ---- FOOTER ---- */
+        footer {
+            border-top: 1px solid var(--color-border);
+            padding: 32px 24px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--color-text-muted);
+        }
+        footer a { color: var(--color-accent); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        .footer-links { display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; }
+
+        /* ---- RESPONSIVE ---- */
+        @media (max-width: 640px) {
+            .nav-links { gap: 16px; }
+            .hero { padding: 48px 20px 40px; }
+            .hero h1 { font-size: 2rem; }
+            .features, .providers { padding: 48px 20px; }
+            .quickstart { padding: 48px 20px; }
+            .funding { padding: 48px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV -->
+    <nav>
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                ZotExtract
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#quickstart">Get Started</a>
+                <a href="#funding">Funding</a>
+                <a href="https://github.com/SamyAteia/ZotExtract">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Developed within NFDIxCS
+        </div>
+        <h1>Extract insights from PDFs<br>with <span>LLMs in Zotero</span></h1>
+        <p>ZotExtract is a Zotero 7 plugin that lets you query large language models about your research PDFs. Run local LLMs for full privacy or connect to online providers.</p>
+        <div class="hero-actions">
+            <a href="https://github.com/SamyAteia/ZotExtract/releases" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Latest Release
+            </a>
+            <a href="https://github.com/SamyAteia/ZotExtract" class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                View on GitHub
+            </a>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features" id="features">
+        <h2>Features</h2>
+        <p>Everything you need to leverage LLMs for your research workflow — right inside Zotero.</p>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon blue">📄</div>
+                <h3>PDF Context Extraction</h3>
+                <p>Automatically extract full text from PDFs or send the raw PDF file to a file-capable AI endpoint for deep analysis.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon green">📚</div>
+                <h3>Batch Processing</h3>
+                <p>Select multiple items and process them all at once. A progress bar tracks each item as it's analysed by the LLM.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon purple">💬</div>
+                <h3>Prompt Library</h3>
+                <p>Use built-in prompts for summaries, methods, and limitations — or create and save your own custom questions.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon orange">🔒</div>
+                <h3>Privacy-First</h3>
+                <p>Run local LLMs (Ollama, LM Studio, etc.) for complete data privacy. API keys stay in your local Zotero profile.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon teal">📝</div>
+                <h3>Auto-Save as Notes</h3>
+                <p>LLM responses are saved as child notes on each item, keeping your analysis organised and searchable in Zotero.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon rose">⚙️</div>
+                <h3>Flexible Configuration</h3>
+                <p>Connect any OpenAI-compatible API. Configure model, base URL, system prompt, and custom PDF endpoints.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- QUICKSTART -->
+    <section class="quickstart" id="quickstart">
+        <div class="quickstart-inner">
+            <h2>Get Started in Minutes</h2>
+            <p>Install the plugin, configure your LLM provider, and start extracting insights.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <h3>Download</h3>
+                    <p>Grab the latest <code>.xpi</code> file from the <a href="https://github.com/SamyAteia/ZotExtract/releases" style="color:#93c5fd">Releases</a> page on GitHub.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <h3>Install</h3>
+                    <p>In Zotero 7, go to <strong>Tools → Add-ons</strong>, click the gear icon, and choose <em>Install Add-on From File</em>.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <h3>Configure</h3>
+                    <p>Open <strong>Settings → ZotExtract</strong> and enter your API base URL, model, and key. Or point to a local <code>Ollama</code> server.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <h3>Extract</h3>
+                    <p>Right-click any item → <strong>ZotExtract</strong>. Pick a prompt and get AI-powered insights saved as notes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PROVIDERS -->
+    <section class="providers">
+        <h2>Works With Your Favourite LLM</h2>
+        <p>Connect to any OpenAI-compatible API — cloud or local.</p>
+        <div class="provider-list">
+            <div class="provider-tag"><span class="dot green"></span> OpenAI</div>
+            <div class="provider-tag"><span class="dot blue"></span> Ollama</div>
+            <div class="provider-tag"><span class="dot purple"></span> LM Studio</div>
+            <div class="provider-tag"><span class="dot orange"></span> Any OpenAI-compatible API</div>
+        </div>
+    </section>
+
+    <!-- FUNDING -->
+    <section class="funding" id="funding">
+        <div class="funding-inner">
+            <h2>Funding &amp; Acknowledgements</h2>
+            <a href="https://nfdixcs.org/">
+                <img src="assets/NFDIxCS_Logo2024_deepblue.png" alt="NFDIxCS Logo" class="funding-logo">
+            </a>
+            <p>
+                ZotExtract is developed at the <strong><a href="https://www.uni-regensburg.de/informatik-data-science/fakultaet/einrichtungen/informationswissenschaft" style="color:var(--color-accent)">Chair of Information Science</a></strong>,
+                <a href="https://www.uni-regensburg.de/" style="color:var(--color-accent)">University of Regensburg</a>, as part of
+                <strong><a href="https://nfdixcs.org/" style="color:var(--color-accent)">NFDIxCS</a></strong> — the
+                <em>National Research Data Infrastructure for and with Computer Science</em> (NFDI×CS).
+                NFDIxCS promotes the implementation of FAIR Data Principles for computer-science research data and software artefacts.
+            </p>
+            <p>
+                <strong>NFDIxCS</strong> is funded by the <a href="https://www.dfg.de/" style="color:var(--color-accent)">German Research Foundation (DFG)</a>
+                under the <a href="https://www.nfdi.de/" style="color:var(--color-accent)">National Research Data Infrastructure (NFDI)</a> programme.
+            </p>
+            <div class="funding-links">
+                <a href="https://nfdixcs.org/">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    nfdixcs.org
+                </a>
+                <a href="https://nfdi.social/@nfdixcs">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.327 8.566c0-4.339-2.843-5.61-2.843-5.61-1.433-.658-3.894-.935-6.451-.956h-.063c-2.557.021-5.016.298-6.45.956 0 0-2.843 1.272-2.843 5.61 0 .993-.019 2.181.012 3.441.103 4.243.778 8.425 4.701 9.463 1.809.479 3.362.579 4.612.51 2.268-.126 3.541-.809 3.541-.809l-.075-1.646s-1.621.511-3.441.449c-1.804-.062-3.707-.194-3.999-2.409a4.523 4.523 0 0 1-.04-.621s1.77.432 4.014.535c1.372.063 2.658-.08 3.965-.236 2.506-.299 4.688-1.843 4.962-3.254.431-2.223.396-5.424.396-5.424zM17.9 14.108h-2.079V9.094c0-1.055-.444-1.591-1.332-1.591-.982 0-1.474.636-1.474 1.891v2.736h-2.068V9.394c0-1.255-.492-1.891-1.474-1.891-.888 0-1.332.536-1.332 1.591v5.014H6.063V8.888c0-1.055.269-1.891.807-2.509.556-.618 1.283-.935 2.186-.935 1.044 0 1.835.401 2.356 1.204l.508.852.508-.852c.521-.803 1.312-1.204 2.356-1.204.903 0 1.63.317 2.186.935.538.618.807 1.454.807 2.509v5.22z"/></svg>
+                    Mastodon
+                </a>
+                <a href="https://bsky.app/profile/nfdixcs.bsky.social">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.596 6.449.764 2.794 3.497 3.722 5.972 3.472-.36.108-.64.243-.851.404-1.637 1.248-.581 3.456.869 4.4 2.718 1.769 5.084.268 5.414-1.704.33 1.972 2.696 3.473 5.414 1.704 1.45-.944 2.506-3.152.869-4.4-.211-.161-.491-.296-.851-.404 2.475.25 5.208-.678 5.972-3.472C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.3-1.664-.621-4.3 1.24C16.046 4.747 13.087 8.686 12 10.8z"/></svg>
+                    Bluesky
+                </a>
+                <a href="https://www.linkedin.com/company/106086471">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                    LinkedIn
+                </a>
+            </div>
+            <div class="funding-orgs">
+                <span>Developed at <a href="https://www.uni-regensburg.de/informatik-data-science/fakultaet/einrichtungen/informationswissenschaft">University of Regensburg — Chair of Information Science</a></span>
+                <span>Contact: <a href="mailto:Samy.Ateia@sprachlit.uni-regensburg.de">Samy Ateia</a></span>
+            </div>
+            <div class="funding-orgs" style="margin-top: 12px;">
+                <span>NFDIxCS operated by <a href="https://gi.de/">Gesellschaft für Informatik e.V.</a></span>
+                <span>Consortium led by <a href="https://www.uni-due.de/">University of Duisburg-Essen</a></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="footer-links">
+            <a href="https://github.com/SamyAteia/ZotExtract">GitHub</a>
+            <a href="https://github.com/SamyAteia/ZotExtract/issues">Issues</a>
+            <a href="https://github.com/SamyAteia/ZotExtract/blob/main/CONTRIBUTING.md">Contributing</a>
+            <a href="https://github.com/SamyAteia/ZotExtract/blob/main/LICENSE">License</a>
+        </div>
+        <p>ZotExtract is open source under the <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0 License</a>. Part of the <a href="https://nfdixcs.org/">NFDIxCS</a> project, funded by the <a href="https://www.dfg.de/">DFG</a>.</p>
+    </footer>
+
+</body>
+</html>
