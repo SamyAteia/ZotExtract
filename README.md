@@ -2,7 +2,7 @@
   <img src="assets/NFDIxCS_Logo2024_deepblue.png" alt="NFDIxCS Logo" width="360">
 </p>
 
-<h1 align="center">ZotExtract</h1>
+<h1 align="center"><a href="https://samyateia.github.io/ZotExtract/" style="color:inherit;text-decoration:none;">ZotExtract</a></h1>
 
 <p align="center">
   <strong>A Zotero plugin for LLM-based information extraction</strong><br>
