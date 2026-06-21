@@ -27,31 +27,13 @@ Open a [feature request](https://github.com/SamyAteia/ZotExtract/issues/new?temp
    git checkout -b feature/my-improvement
    ```
 2. Make your changes — keep commits focused and well-described.
-3. **Test** your changes by building the plugin and loading it in Zotero 7:
+3. **Test** your changes by building the plugin and loading it in Zotero 7, 8, or 9:
    ```bash
    ./build.sh        # Linux/macOS
    build.cmd          # Windows
    ```
 4. Open a **Pull Request** against `main` with a clear description of what changed and why.
 
-### Code Style
-
-- Use clear, descriptive variable and function names.
-- Add JSDoc comments to public methods.
-- Keep functions focused — prefer small, single-purpose functions.
-- Follow the existing code style and indentation (4 spaces).
-
-### Commit Messages
-
-Write clear commit messages:
-
-```
-feat: add support for Anthropic API format
-fix: handle missing PDF attachments gracefully
-docs: update configuration instructions
-```
-
-Use conventional prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 
 ## Development Setup
 
@@ -64,14 +46,14 @@ Use conventional prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chor
    ```bash
    ./build.sh
    ```
-3. Install in Zotero 7 via **Tools → Add-ons → Install from File**.
+3. Install in Zotero 7, 8, or 9 via **Tools → Add-ons → Install from File**.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [CC BY 4.0 License](https://creativecommons.org/licenses/by/4.0/).
+By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/SamyAteia/ZotExtract/discussions) on GitHub.
+- Open a GitHub issue for project questions that should be tracked publicly.
 - Contact the maintainer: [Samy Ateia](mailto:Samy.Ateia@sprachlit.uni-regensburg.de) (University of Regensburg, Chair of Information Science).
 - Reach out to the NFDIxCS team at [nfdixcs.org/contact](https://nfdixcs.org/contact).

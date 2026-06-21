@@ -4,92 +4,179 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <script type="application/javascript" src="chrome://zotero/content/include.js"></script>
     <style type="text/css"><![CDATA[
-        body { padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f7f7fb; }
-        h2 { margin-top: 0; }
-        .card { background: #fff; border: 1px solid #e4e4eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+        :root {
+            --ze-background: var(--color-sidepane, #f5f6f8);
+            --ze-surface: var(--material-background, #ffffff);
+            --ze-border: var(--material-border, #d8dde5);
+            --ze-text: var(--color-text, #2b3036);
+            --ze-muted: var(--color-text-secondary, #606b78);
+            --ze-accent: var(--fill-primary, #4f7be8);
+            --ze-accent-text: var(--fill-primary-text, #ffffff);
+        }
+        body { padding: 20px; background: var(--ze-background); color: var(--ze-text); }
+        h2 { margin: 0 0 8px; font-size: 22px; }
+        h3 { margin: 0 0 12px; font-size: 15px; letter-spacing: 0; }
+        .intro { margin: 0 0 16px; color: var(--ze-muted); max-width: 780px; line-height: 1.4; }
+        .card { background: var(--ze-surface); border: 1px solid var(--ze-border); border-radius: 6px; padding: 16px; margin-bottom: 16px; }
         .group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
         .group.full { grid-template-columns: 1fr; }
+        .stack { display: flex; flex-direction: column; gap: 12px; }
+        .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         label { display: block; font-weight: 600; margin-bottom: 4px; }
-        input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        input, textarea, select { width: 100%; padding: 8px; border: 1px solid var(--ze-border); border-radius: 4px; box-sizing: border-box; font-size: 14px; background: var(--ze-surface); color: var(--ze-text); }
+        input:focus, textarea:focus, select:focus { outline: 2px solid var(--ze-accent); border-color: var(--ze-accent); }
         textarea { min-height: 100px; resize: vertical; }
-        .hint { font-size: 12px; color: #666; margin: 4px 0 0; }
-        .prompt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-        .prompt-row { display: flex; align-items: center; gap: 8px; border: 1px solid #e4e4eb; border-radius: 4px; padding: 8px 10px; background: #fafafe; }
-        .prompt-row .meta { flex: 1; }
-        .prompt-row .meta strong { display: block; }
-        .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #eef2ff; color: #334155; border: 1px solid #cbd5ff; }
-        button { padding: 8px 12px; border: 1px solid #3b82f6; background: #2563eb; color: #fff; border-radius: 4px; cursor: pointer; font-weight: 600; }
-        button.secondary { background: #fff; color: #2563eb; }
-        button.danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
-        .actions { display: flex; gap: 8px; }
+        .hint { font-size: 12px; color: var(--ze-muted); margin: 4px 0 0; line-height: 1.35; }
+        .session-link { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border: 1px solid var(--ze-accent); background: var(--ze-accent); color: var(--ze-accent-text); border-radius: 4px; cursor: pointer; font-weight: 600; line-height: 1.2; text-decoration: none; }
+        .status { border: 1px solid var(--ze-border); background: var(--ze-background); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--ze-text); display: none; }
+        .status.visible { display: block; }
+        .status strong { color: var(--ze-text); }
+        .discovery-results { display: grid; gap: 8px; }
+        .server-card { border: 1px solid var(--ze-border); border-radius: 6px; padding: 10px 12px; background: var(--ze-surface); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+        .server-card .name { font-weight: 700; }
+        .server-card .meta { font-size: 12px; color: var(--ze-muted); margin-top: 2px; overflow-wrap: anywhere; }
+        .context-readout { border: 1px solid var(--ze-border); border-radius: 6px; background: var(--ze-background); padding: 8px 10px; font-size: 12px; color: var(--ze-text); margin-top: 8px; }
+        .context-readout strong { color: var(--ze-text); }
+        .model-combobox { position: relative; }
+        .model-combobox input { padding-right: 34px; }
+        .model-menu-toggle { position: absolute; top: 1px; right: 1px; width: 32px; height: calc(100% - 2px); min-height: 0; border: 0; border-left: 1px solid var(--ze-border); border-radius: 0 4px 4px 0; background: var(--ze-surface); color: var(--ze-muted); padding: 0; }
+        .model-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-height: 220px; overflow: auto; border: 1px solid var(--ze-border); border-radius: 6px; background: var(--ze-surface); box-shadow: 0 8px 18px rgba(15,23,42,.14); }
+        .model-menu.visible { display: block; }
+        .model-option { padding: 8px 10px; cursor: pointer; overflow-wrap: anywhere; }
+        .model-option:hover, .model-option.active { background: var(--ze-background); }
+        .model-option.empty { color: var(--ze-muted); cursor: default; }
+        a { color: var(--ze-accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button { min-height: 34px; padding: 0 12px; border: 1px solid var(--ze-accent); background: var(--ze-accent); color: var(--ze-accent-text); border-radius: 4px; cursor: pointer; font-weight: 600; line-height: 1.2; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+        button.secondary { background: var(--ze-surface); color: var(--ze-text); }
+        button.danger { border-color: #b42318; background: #b42318; color: #ffffff; }
+        button:disabled { opacity: 0.6; cursor: default; }
+        details.advanced { border: 1px solid var(--ze-border); border-radius: 6px; background: var(--ze-background); }
+        details.advanced summary { cursor: pointer; padding: 12px 14px; font-weight: 700; }
+        details.advanced .advanced-body { padding: 0 14px 14px; }
+        @media (max-width: 760px) {
+            .group { grid-template-columns: 1fr; }
+            .server-card { grid-template-columns: 1fr; }
+        }
     ]]></style>
 </head>
 <body>
     <h2>ZotExtract Settings</h2>
+    <p class="intro">Configure the model provider used by ZotExtract sessions.</p>
 
     <div class="card">
         <h3>Model Provider</h3>
-        <div class="group">
+        <div class="stack">
             <div>
-                <label for="providerName">Provider name</label>
-                <input type="text" id="providerName" placeholder="OpenAI, Local LLM, Ollama..." />
-                <p class="hint">Shown in the prompt picker.</p>
+                <h3>Local Model Server</h3>
+                <p class="hint">Find Ollama, LM Studio, llama.cpp, or another OpenAI-compatible server running on this computer.</p>
+                <div class="row" style="margin-top:8px">
+                    <button type="button" id="discoverLocalProviders">Discover local servers</button>
+                    <button type="button" class="secondary" id="downloadLmStudio">Download LM Studio</button>
+                </div>
+                <div id="discoveryStatus" class="status" role="status" aria-live="polite"></div>
+                <div id="discoveryResults" class="discovery-results" style="margin-top:8px"></div>
             </div>
-            <div>
-                <label for="model">Model</label>
-                <input type="text" id="model" placeholder="gpt-4o-mini" />
-                <p class="hint">Any OpenAI-compatible model id.</p>
+            <div class="group">
+                <div>
+                    <label for="providerName">Provider name</label>
+                    <input type="text" id="providerName" placeholder="OpenAI, Local LLM, Ollama..." />
+                    <p class="hint">Shown in session details and exports.</p>
+                </div>
+                <div>
+                    <label for="model">Model</label>
+                    <div class="model-combobox" data-model-combobox="true">
+                        <input type="text" id="model" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="modelOptions" placeholder="provider-model-id" />
+                        <button type="button" class="model-menu-toggle" id="modelMenuToggle" aria-label="Show available models">v</button>
+                        <div id="modelOptions" class="model-menu" role="listbox"></div>
+                    </div>
+                    <p class="hint">Type any OpenAI-compatible model id or choose one discovered from the provider.</p>
+                    <div id="contextWindowReadout" class="context-readout"><strong>Context window:</strong> Unknown. Discover a local server or check from advanced settings.</div>
+                </div>
             </div>
-            <div>
-                <label for="baseUrl">API base URL</label>
-                <input type="text" id="baseUrl" placeholder="https://api.openai.com/v1" />
-                <p class="hint">Use a custom URL for local or remote providers.</p>
-            </div>
-            <div>
-                <label for="apiKey">API key</label>
-                <input type="password" id="apiKey" placeholder="sk-..." />
-                <p class="hint">Only stored locally in your Zotero profile.</p>
-            </div>
-            <div>
-                <label for="fileEndpoint">PDF endpoint (optional)</label>
-                <input type="text" id="fileEndpoint" placeholder="http://localhost:8000/v1/pdf-chat" />
-                <p class="hint">Used when a prompt uses Send PDF file. Endpoint should accept multipart file + prompt.</p>
-            </div>
-            <div>
-                <label for="systemPrompt">System prompt (optional)</label>
-                <input type="text" id="systemPrompt" placeholder="You are a helpful research assistant." />
-                <p class="hint">Prepended to every request.</p>
-            </div>
+            <details class="advanced" id="advancedProviderConfig">
+                <summary>Advanced provider configuration</summary>
+                <div class="advanced-body">
+                    <div class="group">
+                        <div>
+                            <label for="baseUrl">API base URL</label>
+                            <input type="text" id="baseUrl" placeholder="https://api.openai.com/v1" />
+                            <p class="hint">Use a custom URL for local or remote providers.</p>
+                        </div>
+                        <div>
+                            <label for="apiKey">API key</label>
+                            <input type="password" id="apiKey" placeholder="sk-..." />
+                            <p class="hint">Only stored locally in your Zotero profile.</p>
+                        </div>
+                        <div>
+                            <label for="timeoutSeconds">Request timeout</label>
+                            <input type="number" id="timeoutSeconds" min="5" max="600" step="5" placeholder="120" />
+                            <p class="hint">Seconds before a slow model request is cancelled.</p>
+                        </div>
+                        <div>
+                            <label for="systemPrompt">System prompt (optional)</label>
+                            <input type="text" id="systemPrompt" placeholder="You are a helpful research assistant." />
+                            <p class="hint">Prepended to every request.</p>
+                        </div>
+                        <div>
+                            <label for="contextWindowTokens">Context window</label>
+                            <input type="number" id="contextWindowTokens" min="512" step="512" placeholder="Auto-detected when available" />
+                            <p class="hint">Usable input window in tokens. LM Studio reports both model maximum and currently loaded context; ZotExtract stores the active usable value.</p>
+                            <div class="row" style="margin-top:8px">
+                                <button type="button" class="secondary" id="checkContextWindow">Load model and check context</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="concurrentRequests">Concurrent requests</label>
+                            <input type="number" id="concurrentRequests" min="1" max="16" step="1" placeholder="4" />
+                            <p class="hint">How many extraction cells ZotExtract may process at once. Local providers often work well with 1-4; remote providers may allow more.</p>
+                        </div>
+                        <div>
+                            <label for="reasoningEffort">Reasoning effort</label>
+                            <select id="reasoningEffort">
+                                <option value="">Provider default</option>
+                                <option value="none">None (default)</option>
+                                <option value="minimal">Minimal</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                            <p class="hint">ZotExtract disables model-side reasoning by default and asks for a short visible reasoning section in the final answer. Choose Provider default or another effort only when your provider needs it.</p>
+                        </div>
+                        <div>
+                            <label for="maxTextCharacters">Full-text character cap</label>
+                            <input type="number" id="maxTextCharacters" min="10000" max="2000000" step="10000" placeholder="400000" />
+                            <p class="hint">Upper safety limit for indexed PDF text before extraction. Larger values preserve more paper text but can increase memory use and evidence-pass work.</p>
+                        </div>
+                    </div>
+                    <div class="group full" style="margin-top:14px">
+                        <div>
+                            <label for="wholePromptTemplate">Final answer prompt template</label>
+                            <textarea id="wholePromptTemplate" placeholder="Extraction question: {{question}}&#10;&#10;Line-numbered answer context: {{context}}"></textarea>
+                            <p class="hint">Used for the final answer. Use <strong>{{question}}</strong> where the extraction question should be injected and <strong>{{context}}</strong> where ZotExtract should inject metadata plus line-numbered context.</p>
+                        </div>
+                        <div>
+                            <label for="chunkPromptTemplate">Evidence collection prompt template</label>
+                            <textarea id="chunkPromptTemplate" placeholder="Extraction question: {{question}}&#10;&#10;Window {{windowIndex}}/{{windowCount}}: {{context}}"></textarea>
+                            <p class="hint">Used for the first pass over line-numbered full text. Papers that fit the provider window usually use one evidence window; large papers use overlapping windows. Available placeholders: <strong>{{question}}</strong>, <strong>{{context}}</strong>, <strong>{{windowIndex}}</strong>, <strong>{{windowCount}}</strong>, and <strong>{{windowRange}}</strong>.</p>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </div>
     </div>
 
     <div class="card">
-        <h3>Prompt Library</h3>
-        <p class="hint">Define reusable questions. Choose Full text to send extracted text or Send PDF file to post the PDF to a file-capable endpoint.</p>
+        <a href="#" id="openSessionsFromPreferences" class="session-link">Start Zotextract Session</a>
+    </div>
 
-        <div id="promptList" class="prompt-list"></div>
-
-        <div class="group full" style="margin-top: 12px;">
-            <div>
-                <label for="promptName">Prompt name</label>
-                <input type="text" id="promptName" placeholder="Summarize" />
-            </div>
-            <div>
-                <label for="promptContext">Context source</label>
-                <select id="promptContext">
-                    <option value="fulltext">Full text (extracted)</option>
-                    <option value="pdf-file">Send PDF file</option>
-                </select>
-            </div>
-            <div>
-                <label for="promptText">Prompt</label>
-                <textarea id="promptText" placeholder="Summarize the paper in 5 bullet points..."></textarea>
-            </div>
-            <div class="actions">
-                <button id="savePrompt">Add prompt</button>
-                <button id="cancelEdit" class="secondary">Cancel</button>
-            </div>
+    <div class="card">
+        <h3>Plugin Data</h3>
+        <p class="hint">Delete ZotExtract sessions, saved question sets, result cells, and ZotExtract preferences from this local Zotero profile. Zotero library items and PDFs are not deleted.</p>
+        <div class="row" style="margin-top:10px">
+            <button type="button" id="deleteZotExtractData" class="danger">Delete ZotExtract Data...</button>
         </div>
+        <div id="dataResetStatus" class="status" role="status" aria-live="polite"></div>
     </div>
 </body>
 </html>

@@ -15,9 +15,35 @@ Desktop.ini
 *.swo
 *~
 
-# Node (if test tooling is added later)
+# Node dependencies
 node_modules/
 npm-debug.log*
 
 # Logs
 *.log
+
+# Local clickable Zotero test environment
+.tools/
+.zotero-test-profile/
+.zotero-docker-profile/
+test-artifacts/
+
+# Local crash dumps from emulated GUI smoke tests
+qemu_*.core
+core
+
+# Local planning material
+planning/
+docs/*_CONTEXT.md
+*.xlsx
+
+# Secrets / local API keys
+.env
+.env.*
+
+# Agent / session data
+.claude/
+
+# Python bytecode
+__pycache__/
+*.pyc

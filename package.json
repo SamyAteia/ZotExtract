@@ -1,0 +1,29 @@
+{
+  "name": "zotextract",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zotero plugin for privacy-preserving LLM-based information extraction from research PDFs.",
+  "scripts": {
+    "test": "node test/test_runner.js",
+    "test:package": "python scripts/check-xpi-contents.py zotextract.xpi",
+    "audit:tokens": "node scripts/token-count-audit.mjs",
+    "build": "./build.sh",
+    "test:env:setup": "bash scripts/setup-zotero-test-env.sh",
+    "fake-openai": "node scripts/fake-openai-server.mjs",
+    "test:zotero:docker": "bash scripts/docker-zotero-test.sh"
+  },
+  "keywords": [
+    "zotero",
+    "nfdixcs",
+    "llm",
+    "information-extraction",
+    "research-tools"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "js-tiktoken": "^1.0.20"
+  }
+}

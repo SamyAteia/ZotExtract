@@ -16,8 +16,8 @@ Describe the feature or change you'd like to see.
 
 ## Alternatives Considered
 
-Any alternative solutions or workarounds you've considered.
+Any alternative approaches you've considered.
 
 ## Additional Context
 
-Any other information, mockups, or references that could help.
+Any other information, screenshots, or references that could help.
