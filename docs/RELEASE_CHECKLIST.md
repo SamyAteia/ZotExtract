@@ -18,6 +18,16 @@ Use this checklist before publishing a ZotExtract `.xpi` release.
 - `test-artifacts/docker-zotero-<version>/runtime-e2e-result.json` reports `ok: true` for each release-line smoke.
 - XLSX, CSV, TSV, JSON, Markdown, and HTML exports are present, are generated from session results, and omit raw PDF full text.
 
+## Publishing
+
+After tests pass, the release commit is on `main`, and the tag has been pushed, create the GitHub release and upload `zotextract.xpi` with:
+
+```bash
+npm run release:github
+```
+
+Use `npm run release:github -- --dry-run` to preview the `gh release create` command and the changelog section that will be used as release notes.
+
 ## Privacy and data handling
 
 - Sessions send Zotero metadata and indexed PDF full text only to the configured chat-completions endpoint.
@@ -28,20 +38,14 @@ Use this checklist before publishing a ZotExtract `.xpi` release.
 
 ## User-facing quality
 
-- Settings page contains provider/model/safety configuration only; no extraction prompt catalog is exposed there.
-- Settings can discover common local model servers and keeps detailed endpoint/security fields collapsed under Advanced.
-- Advanced settings expose the full-text character cap and default it to 400,000 characters.
-- Advanced settings default reasoning effort to None while leaving Provider default/minimal/low/medium/high configurable.
-- Advanced settings expose editable final-answer and evidence-collection prompt templates with `{{question}}` and `{{context}}` placeholders.
-- Default extraction prompts return sectioned output with `## reasoning`, `## context`, and `## answer`, which ZotExtract normalizes during parsing.
-- Add extractions uses the three-column question-set/question/details workflow and hides technical output-type/context controls.
-- Built-in extraction questions are domain-focused and do not expose hidden JSON response-mode artifacts.
-- Completed result cells display the final answer first, make answer text selectable/copyable, expose collapsed evidence/reasoning details, and include a compact PDF evidence action for cited source-line ranges.
-- The session matrix supports horizontal scrolling and persisted column/row resizing.
-- The Zotero item context menu has no item-level ZotExtract export command.
-- Skipped and failed batch items report actionable reasons.
-- README, changelog, and testing docs match the shipped behavior.
-- `manifest.json`, `package.json`, `update.json`, and changelog all use the release version.
+- A new user can follow the core workflow without reading developer docs: configure a provider, create or open a session, add questions, run extraction, inspect results, and export.
+- Provider setup is clear for both local and hosted endpoints, including useful discovery feedback and actionable errors when a model server is unavailable.
+- Settings keep common provider and safety options easy to find, while advanced tuning stays available without dominating the first-use flow.
+- Session screens remain readable with realistic paper/question counts and keep technical diagnostics compact.
+- Results prioritize the final answer while keeping evidence, reasoning, source details, and PDF navigation available when relevant.
+- Built-in questions and prompts are public-facing, domain-focused, and free of implementation artifacts, internal terminology, or hidden response-mode details.
+- Batch runs, skipped items, failures, and exports report enough context for a user to decide what to do next.
+- README, changelog, testing docs, `manifest.json`, `package.json`, and `update.json` match the shipped behavior and release version.
 
 ## Release scope
 

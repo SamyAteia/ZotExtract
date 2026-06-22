@@ -10,7 +10,8 @@
     "build": "./build.sh",
     "test:env:setup": "bash scripts/setup-zotero-test-env.sh",
     "fake-openai": "node scripts/fake-openai-server.mjs",
-    "test:zotero:docker": "bash scripts/docker-zotero-test.sh"
+    "test:zotero:docker": "bash scripts/docker-zotero-test.sh",
+    "release:github": "bash scripts/create-github-release.sh"
   },
   "keywords": [
     "zotero",
