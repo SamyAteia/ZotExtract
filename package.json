@@ -1,6 +1,6 @@
 {
   "name": "zotextract",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Zotero plugin for privacy-preserving LLM-based information extraction from research PDFs.",
   "scripts": {

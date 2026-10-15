@@ -27,7 +27,7 @@ Open a [feature request](https://github.com/SamyAteia/ZotExtract/issues/new?temp
    git checkout -b feature/my-improvement
    ```
 2. Make your changes — keep commits focused and well-described.
-3. **Test** your changes by building the plugin and loading it in Zotero 7, 8, or 9:
+3. **Test** your changes by building the plugin and loading it in Zotero 7, 8, 9, or 10:
    ```bash
    ./build.sh        # Linux/macOS
    build.cmd          # Windows
@@ -46,7 +46,7 @@ Open a [feature request](https://github.com/SamyAteia/ZotExtract/issues/new?temp
    ```bash
    ./build.sh
    ```
-3. Install in Zotero 7, 8, or 9 via **Tools → Add-ons → Install from File**.
+3. Install in Zotero 7, 8, 9, or 10 via **Tools → Add-ons → Install from File**.
 
 ## License
 

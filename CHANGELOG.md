@@ -5,6 +5,22 @@ All notable changes to ZotExtract will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.0.1] - 2026-10-15
+
+### Fixed
+
+- Enabled Zotero 10 installation and updates, and adapted collection actions to its multiple-collection selection API without duplicating shared papers.
+- Recovered missing or incorrect evidence line ranges from unambiguous quotations, including passages wrapped across PDF lines. Unmatched model commentary is excluded from source evidence.
+- Prevented numbers in evidence notes from being interpreted as citation ranges, and restricted unverified citations to their original evidence window.
+- Clarified Firefox downloads in the installation guide, website, and generated release notes: save `zotextract.xpi` with **Save Link As…**, then install it in Zotero.
+- Loaded quote recovery in the automated test environment and required the module in release packages.
+
+### Changed
+
+- Extended GUI lifecycle verification to Zotero 10 and collection actions, and updated Settings and Plugins Manager navigation for current Zotero layouts.
+
 ## [1.0.0] - 2026-06-22
 
 First stable release.
@@ -46,5 +62,6 @@ Alpha release for early testing.
 - Result notes saved under processed Zotero items.
 - NFDIxCS branding and funding acknowledgement.
 
+[1.0.1]: https://github.com/SamyAteia/ZotExtract/releases/tag/v1.0.1
 [1.0.0]: https://github.com/SamyAteia/ZotExtract/releases/tag/v1.0.0
 [0.1.0-alpha]: https://github.com/SamyAteia/ZotExtract/releases/tag/v0.1.0-alpha

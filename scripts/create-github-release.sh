@@ -14,6 +14,7 @@ Options:
   --asset PATH            XPI asset to upload. Defaults to zotextract.xpi.
   --title TITLE           GitHub release title. Defaults to "ZotExtract $VERSION".
   --notes-file PATH       Release notes file. Defaults to the matching CHANGELOG.md section.
+                         Download and installation instructions are prepended in either case.
   --draft                 Create the release as a draft.
   --prerelease            Mark the release as a prerelease.
   --dry-run               Print the release command without creating it.
@@ -105,6 +106,7 @@ $required = @(
   "content/zotextract.css",
   "content/zotextract-data.js",
   "content/zotextract-context.js",
+  "content/zotextract-quote-recovery.js",
   "content/zotextract-runner.js",
   "content/zotextract-window-ui.js",
   "content/zotextract-session-ui.js",
@@ -308,11 +310,14 @@ ASSET_NAME="$(basename "$ASSET")"
 [[ -f update.json ]] || die "update.json not found."
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Run this script from inside the Git repository."
-git rev-parse -q --verify "refs/tags/$TAG^{}" >/dev/null || die "Local tag $TAG does not exist."
-
-if [[ "$SKIP_REMOTE_CHECK" != "1" ]]; then
-  info "Checking that $TAG exists on origin..."
-  git ls-remote --exit-code --tags origin "$TAG" >/dev/null || die "Tag $TAG was not found on origin. Push it first: git push origin $TAG"
+if [[ "$DRY_RUN" == "1" ]]; then
+  info "Dry run: tag availability checks are deferred until publication."
+else
+  git rev-parse -q --verify "refs/tags/$TAG^{}" >/dev/null || die "Local tag $TAG does not exist."
+  if [[ "$SKIP_REMOTE_CHECK" != "1" ]]; then
+    info "Checking that $TAG exists on origin..."
+    git ls-remote --exit-code --tags origin "$TAG" >/dev/null || die "Tag $TAG was not found on origin. Push it first: git push origin $TAG"
+  fi
 fi
 
 if [[ "$SKIP_PACKAGE_CHECK" != "1" ]]; then
@@ -332,6 +337,8 @@ if [[ "$DRY_RUN" != "1" ]]; then
 fi
 
 TMP_NOTES=""
+TMP_RELEASE_NOTES=""
+trap '[[ -z "${TMP_NOTES:-}" ]] || rm -f "$TMP_NOTES"; [[ -z "${TMP_RELEASE_NOTES:-}" ]] || rm -f "$TMP_RELEASE_NOTES"' EXIT
 if [[ -n "$NOTES_FILE" ]]; then
   [[ -f "$NOTES_FILE" ]] || die "Release notes file not found: $NOTES_FILE"
 else
@@ -339,7 +346,22 @@ else
   extract_changelog_notes "$VERSION" "$TMP_NOTES"
   NOTES_FILE="$TMP_NOTES"
 fi
-trap '[[ -n "${TMP_NOTES:-}" ]] && rm -f "$TMP_NOTES"' EXIT
+
+TMP_RELEASE_NOTES="$(mktemp)"
+cat > "$TMP_RELEASE_NOTES" <<'EOF'
+### Download and install
+
+Download `zotextract.xpi` from **Assets** below.
+
+**Firefox:** right-click `zotextract.xpi` and choose **Save Link As…**. A normal click makes Firefox try to install it as a browser extension and may show an unsigned-add-on warning. Save the file, then install it in Zotero; Firefox security settings do not need to be changed.
+
+In Zotero, open **Tools → Plugins** (or **Add-ons**), click the gear icon, choose **Install Plugin From File…** (or **Install Add-on From File…**), and select the saved `.xpi`.
+
+---
+
+EOF
+cat "$NOTES_FILE" >> "$TMP_RELEASE_NOTES"
+NOTES_FILE="$TMP_RELEASE_NOTES"
 
 CMD=(gh release create "$TAG" "$ASSET" --title "$TITLE" --notes-file "$NOTES_FILE")
 [[ "$DRAFT" == "1" ]] && CMD+=(--draft)

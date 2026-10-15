@@ -3,12 +3,12 @@
     "zotextract@nfdixcs.org": {
       "updates": [
         {
-          "version": "1.0.0",
-          "update_link": "https://github.com/SamyAteia/ZotExtract/releases/download/v1.0.0/zotextract.xpi",
+          "version": "1.0.1",
+          "update_link": "https://github.com/SamyAteia/ZotExtract/releases/download/v1.0.1/zotextract.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "7.0",
-              "strict_max_version": "9.*"
+              "strict_max_version": "10.0.*"
             }
           }
         }

@@ -246,6 +246,7 @@ const pluginModulePaths = [
     '../content/zotextract-window.js',
     '../content/zotextract-data.js',
     '../content/zotextract-context.js',
+    '../content/zotextract-quote-recovery.js',
     '../content/zotextract-runner.js',
     '../content/zotextract-window-ui.js',
     '../content/zotextract-session-ui.js',

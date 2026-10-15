@@ -12,14 +12,14 @@
 <p align="center">
   <a href="https://github.com/SamyAteia/ZotExtract/releases"><img src="https://img.shields.io/github/v/release/SamyAteia/ZotExtract?style=flat-square" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
-  <a href="https://www.zotero.org/"><img src="https://img.shields.io/badge/Zotero-7--9-red?style=flat-square" alt="Zotero 7-9"></a>
+  <a href="https://www.zotero.org/"><img src="https://img.shields.io/badge/Zotero-7--10-red?style=flat-square" alt="Zotero 7-10"></a>
 </p>
 
 ---
 
 ## About
 
-**ZotExtract** is a [Zotero](https://www.zotero.org/) plugin for Zotero 7, 8, and 9. It helps you ask the same questions across selected papers, review the answers in Zotero, and export the results. You can use **local LLMs** on your own device or connect to **online providers**.
+**ZotExtract** is a [Zotero](https://www.zotero.org/) plugin for Zotero 7, 8, 9, and 10. It helps you ask the same questions across selected papers, review the answers in Zotero, and export the results. You can use **local LLMs** on your own device or connect to **online providers**.
 
 ZotExtract is developed at the [Chair of Information Science](https://www.uni-regensburg.de/sprache-literatur-kultur/informationswissenschaft/), University of Regensburg, within the **[NFDIxCS](https://nfdixcs.org/)** project, the *National Research Data Infrastructure for and with Computer Science*.
 
@@ -41,9 +41,10 @@ ZotExtract is built for researchers who want LLM help without leaving Zotero. It
 
 ## Installation
 
-1. Download the latest `.xpi` file from the [Releases](https://github.com/SamyAteia/ZotExtract/releases) page.
-2. In Zotero, go to **Tools → Add-ons**.
-3. Click the gear icon ⚙️ → **Install Add-on From File…** and select the downloaded `.xpi`.
+1. Download `zotextract.xpi` from **Assets** on the [latest release](https://github.com/SamyAteia/ZotExtract/releases/latest).
+   **Firefox:** right-click `zotextract.xpi` and choose **Save Link As…**. A normal click makes Firefox try to install it as a browser extension and may show an unsigned-add-on warning. Save the file, then install it in Zotero; Firefox security settings do not need to be changed.
+2. In Zotero, go to **Tools → Plugins** (called **Add-ons** in some versions).
+3. Click the gear icon ⚙️ → **Install Plugin From File…** (or **Install Add-on From File…**) and select the saved `.xpi`.
 4. Restart Zotero when prompted.
 
 ## Configuration
@@ -91,6 +92,8 @@ Question prompts are managed in the **Add extractions** view. The question edito
 
 When possible, answers cite line IDs such as `L000123`. ZotExtract keeps the final answer easy to read and lets you expand the supporting lines when needed.
 
+During evidence collection, ZotExtract checks long quotations against the paper text. An unambiguous verbatim match can recover missing or incorrect line ranges, including wrapped passages. Only original source lines are passed to the answer stage; unmatched model commentary is not treated as a quotation from the paper.
+
 For long papers, ZotExtract works through the text in smaller parts. Very long text is capped by the full-text limit in Settings, which defaults to 400,000 characters.
 
 ## Export
@@ -105,7 +108,7 @@ Provider settings include a request timeout so slow endpoints do not block ZotEx
 
 ### Prerequisites
 
-- [Zotero 7, 8, or 9](https://www.zotero.org/) installed
+- [Zotero 7, 8, 9, or 10](https://www.zotero.org/) installed
 - An archive tool for builds: `zip`, Python 3, bsdtar, or PowerShell
 
 ### Build

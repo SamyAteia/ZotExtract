@@ -638,22 +638,26 @@ var ZotExtractData = {
         async selectedCollectionItems() {
             try {
                 const pane = Zotero.getActiveZoteroPane();
-                const collection = pane.getSelectedCollection?.() || pane.getSelectedCollectionTreeRow?.()?.ref;
-                if (!collection) return [];
-                let children = [];
-                if (typeof collection.getChildItems === 'function') {
-                    children = await collection.getChildItems();
-                } else if (typeof collection.getChildItemsAsync === 'function') {
-                    children = await collection.getChildItemsAsync();
+                // Zotero 10 supports selecting multiple collections; older versions use a singular getter.
+                const collections = typeof pane.getSelectedCollections === 'function'
+                    ? pane.getSelectedCollections()
+                    : [pane.getSelectedCollection?.() || pane.getSelectedCollectionTreeRow?.()?.ref].filter(Boolean);
+                const items = new Map();
+                for (const collection of collections) {
+                    let children = [];
+                    if (typeof collection.getChildItems === 'function') {
+                        children = await collection.getChildItems();
+                    } else if (typeof collection.getChildItemsAsync === 'function') {
+                        children = await collection.getChildItemsAsync();
+                    }
+                    for (const child of children || []) {
+                        const item = typeof child === 'number'
+                            ? (Zotero.Items.get(child) || await Zotero.Items.getAsync?.(child))
+                            : child;
+                        if (item) items.set(item.id, item);
+                    }
                 }
-                const items = [];
-                for (const child of children || []) {
-                    const item = typeof child === 'number'
-                        ? (Zotero.Items.get(child) || await Zotero.Items.getAsync?.(child))
-                        : child;
-                    if (item) items.push(item);
-                }
-                return this.regularItems(items);
+                return this.regularItems(Array.from(items.values()));
             } catch (e) {
                 Zotero.logError(e);
                 return [];

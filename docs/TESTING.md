@@ -51,7 +51,7 @@ so it is repeatable and finishes in minutes:
 8. Zotero relaunched with the GUI-installed plugin active
 9. first-install provider setup tip is visible and captured
 10. ZotExtract Settings opened through `Edit -> Settings`
-11. provider fields typed into the real settings UI
+11. provider pane opened in the real settings UI; deterministic provider values configured by the runtime harness
 12. fixture PDF items created through Zotero APIs after settings are complete
 13. ZotExtract Sessions list captured
 14. empty session matrix captured with title/context-size rows and Add extractions hint
@@ -96,6 +96,7 @@ Then set the ZotExtract API base URL to `http://127.0.0.1:8789/v1`.
 bash scripts/run-zotero-version-smoke.sh 7.0.32
 bash scripts/run-zotero-version-smoke.sh 8.0.4
 bash scripts/run-zotero-version-smoke.sh 9.0.4
+bash scripts/run-zotero-version-smoke.sh 10.0.6
 ```
 
 Or set `ZOTERO_VERSION` and use a separate artifact directory:
@@ -104,7 +105,17 @@ Or set `ZOTERO_VERSION` and use a separate artifact directory:
 ZOTERO_VERSION=7.0.32 ARTIFACTS="$PWD/test-artifacts/docker-zotero-7.0.32" npm run test:zotero:docker
 ZOTERO_VERSION=8.0.4 ARTIFACTS="$PWD/test-artifacts/docker-zotero-8.0.4" npm run test:zotero:docker
 ZOTERO_VERSION=9.0.4 ARTIFACTS="$PWD/test-artifacts/docker-zotero-9.0.4" npm run test:zotero:docker
+ZOTERO_VERSION=10.0.6 ARTIFACTS="$PWD/test-artifacts/docker-zotero-10.0.6" npm run test:zotero:docker
 ```
+
+Collection coverage starts a session from one collection, adds an overlapping collection, and,
+on Zotero 10, starts a session from two selected collections. The resulting paper IDs must match
+the selection without duplicates. Evidence is recorded in `collectionActions` in the runtime
+result and `ui-14d-collection-session.png`.
+
+To run the real Zotero GUI lifecycle independently of the Node mock tests, set
+`ZOTEXTRACT_SKIP_UNIT_TESTS=1`. The report explicitly records the skipped gate; this is not a
+passing full release gate. Leave the variable unset for release verification.
 
 ### Watching the UI live
 
@@ -121,7 +132,7 @@ Desktop WSL integration and rerun it.
 ## 4. Manual Zotero smoke test
 
 1. Build the extension with `./build.sh`.
-2. Open Zotero 7, 8, or 9.
+2. Open Zotero 7, 8, 9, or 10.
 3. Install `zotextract.xpi` via Tools → Add-ons → Install Add-on From File.
 4. Restart Zotero.
 5. Configure provider settings in Zotero preferences:

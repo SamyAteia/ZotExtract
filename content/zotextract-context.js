@@ -152,7 +152,10 @@ var ZotExtractContext = {
                 lineWindows: collected.map(entry => ({
                     windowIndex: entry.windowIndex,
                     windowCount: entry.windowCount,
-                    range: entry.range
+                    range: entry.range,
+                    recoveredQuoteCount: entry.recoveredQuoteCount || 0,
+                    discardedEvidenceCount: entry.discardedEvidenceCount || 0,
+                    recovery: entry.recovery || []
                 })),
                 warnings
             };
@@ -981,6 +984,7 @@ var ZotExtractContext = {
         async collectRelevantLineEvidence(provider, numberedLines, promptText, budgetTokens, runState, warnings = [], options = {}) {
             const plan = await this.evidenceCollectionWindowPlan(provider, numberedLines, promptText, budgetTokens, options);
             const windows = plan.windows || [];
+            const quoteIndex = this.buildEvidenceQuoteIndex(numberedLines);
             const collected = [];
             collected.evidenceCollectionMode = plan.mode || (windows.length > 1 ? 'sliding-window' : 'single-window');
             collected.windowCount = windows.length;
@@ -1015,14 +1019,20 @@ var ZotExtractContext = {
                     const evidence = parsed.ok
                         ? this.extractRelevantContextEntries(parsed.value)
                         : this.extractLineRangesFromText(clean);
-                    if (!evidence.length) continue;
-                    const sourceText = this.sourceLinesForEvidence(window.lines, evidence);
+                    const recovery = this.recoverEvidenceSourceLines(numberedLines, evidence, clean, {
+                        citationLines: window.lines, quoteIndex
+                    });
+                    const sourceText = recovery.text;
+                    if (!sourceText) continue;
                     collected.push({
                         windowIndex: window.index,
                         windowCount: windows.length,
                         range: window.range,
-                        text: sourceText || clean,
-                        scanAnswer: sourceText ? clean : ''
+                        text: sourceText,
+                        scanAnswer: clean,
+                        recovery: recovery.diagnostics,
+                        recoveredQuoteCount: recovery.recoveredCount,
+                        discardedEvidenceCount: recovery.discardedCount
                     });
                 }
             }

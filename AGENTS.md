@@ -1,6 +1,6 @@
 # AGENTS.md - ZotExtract
 
-ZotExtract is a Zotero 7-9 plugin for LLM-based information extraction from research PDFs.
+ZotExtract is a Zotero 7-10 plugin for LLM-based information extraction from research PDFs.
 It lets users create extraction sessions from selected Zotero items or collections, ask the
 same questions across papers, review cited answers in Zotero, and export the results as
 XLSX, CSV, TSV, JSON, Markdown, or HTML.
@@ -50,6 +50,7 @@ directories are not bundled into the `.xpi`.
   session creation, and session edit helpers.
 - `content/zotextract-context.js` - item metadata, indexed PDF text extraction, line numbering,
   context budgeting, token counting, and evidence-window planning.
+- `content/zotextract-quote-recovery.js` - source quotation matching and evidence citation recovery.
 - `content/zotextract-runner.js` - session run planning, extraction cell execution, concurrency,
   cancellation, and progress state.
 - `content/zotextract-window-ui.js` - sessions tab shell, library navigation, layout positioning,
@@ -97,6 +98,7 @@ Use the fastest relevant checks for the change, and run the full release gate be
 - `bash scripts/run-zotero-version-smoke.sh 7.0.32`
 - `bash scripts/run-zotero-version-smoke.sh 8.0.4`
 - `bash scripts/run-zotero-version-smoke.sh 9.0.4`
+- `bash scripts/run-zotero-version-smoke.sh 10.0.6`
 
 The Docker tests exercise Zotero installation, settings, session creation, question selection,
 single- and multi-paper runs, PDF evidence navigation, exports, and uninstall.
@@ -113,7 +115,7 @@ single- and multi-paper runs, PDF evidence navigation, exports, and uninstall.
 ## Development Style
 
 - Keep changes small and easy to test.
-- Preserve Zotero 7-9 compatibility.
+- Preserve Zotero 7-10 compatibility.
 - Prefer the existing plain JavaScript and Zotero APIs over new frameworks.
 - Use 4-space indentation in JavaScript.
 - Add JSDoc for public methods when useful.

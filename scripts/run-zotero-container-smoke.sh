@@ -138,8 +138,8 @@ maximize_main_window() {
 
 dismiss_upgrade_banner_if_present() {
   case "${ZOTERO_VERSION:-}" in
-    8.*|9.*)
-      # Zotero 8/9 clean profiles can show a first-upgrade banner that steals
+    8.*|9.*|10.*)
+      # Zotero 8+ clean profiles can show a first-upgrade banner that steals
       # focus from menu automation. This coordinate lands on "Done" when present
       # and on inert main-window space when absent.
       focus_main_window
@@ -206,7 +206,7 @@ open_plugins_manager_from_tools() {
 open_install_file_picker() {
   local picker_pattern="Select (add-on|plugin) to install|Select Add-on to Install|Open File|File Upload"
   local gear_pos gear_x gear_y
-  for gear_pos in "1738 344" "1738 194" "1418 344" "1418 194" "1057 194" "1096 194" "1378 344"; do
+  for gear_pos in "1738 464" "1738 344" "1738 194" "1418 344" "1418 194" "1057 194" "1096 194" "1378 344"; do
     gear_x="${gear_pos% *}"
     gear_y="${gear_pos#* }"
     focus_window "Plugins Manager"
@@ -437,7 +437,7 @@ if (!result.exportPaths || requiredExportFormats.some(format => !result.exportPa
   console.error(JSON.stringify(result.exportPaths || null, null, 2));
   process.exit(1);
 }
-for (const step of ['settings-completed-through-ui', 'fixture-items-created', 'new-session-screens-covered', 'single-session-completed', 'evidence-pdf-covered', 'multi-session-completed', 'export-completed']) {
+for (const step of ['settings-completed-through-ui', 'fixture-items-created', 'collection-session-actions-covered', 'new-session-screens-covered', 'single-session-completed', 'evidence-pdf-covered', 'multi-session-completed', 'export-completed']) {
   if (!Array.isArray(result.steps) || !result.steps.includes(step)) {
     console.error(`Runtime result did not include required step: ${step}`);
     console.error(JSON.stringify(result.steps || null, null, 2));
@@ -554,10 +554,15 @@ Generated: $(date -Is)
 REPORT
 
 cd "$ROOT"
-log "Running npm test"
-npm test > "$ARTIFACTS/npm-test.log" 2>&1
 echo "## npm test" >> "$report"
-echo "Passed. Log: npm-test.log" >> "$report"
+if [ "${ZOTEXTRACT_SKIP_UNIT_TESTS:-0}" = "1" ]; then
+  log "Skipping Node mock tests; running the Zotero GUI lifecycle independently"
+  echo "Skipped explicitly with ZOTEXTRACT_SKIP_UNIT_TESTS=1. This run verifies the GUI lifecycle only." >> "$report"
+else
+  log "Running npm test"
+  npm test > "$ARTIFACTS/npm-test.log" 2>&1
+  echo "Passed. Log: npm-test.log" >> "$report"
+fi
 
 log "Building extension"
 ZOTEXTRACT_INCLUDE_E2E=1 ZOTEXTRACT_OUTPUT_XPI="$EXTENSION_XPI" ./build.sh > "$ARTIFACTS/build.log" 2>&1
@@ -635,7 +640,7 @@ remove_action_y=337
 confirm_remove_x=815
 confirm_remove_y=489
 case "${ZOTERO_VERSION:-}" in
-  8.*|9.*)
+  8.*|9.*|10.*)
     multi_action_y=577
     plugin_actions_x=1406
     plugin_actions_y=452
@@ -725,7 +730,7 @@ capture_ui "08-provider-setup-tip-visible"
 xdotool mousemove 647 251 click 1
 sleep 0.3
 case "${ZOTERO_VERSION:-}" in
-  8.*|9.*)
+  8.*|9.*|10.*)
     xdotool mousemove 952 111 click 1
     sleep 0.3
     ;;
@@ -741,7 +746,8 @@ if ! wait_for_window "Zotero Settings" 8; then
   xdotool mousemove 66 38 click 1
   sleep 0.5
   capture_ui "09-edit-settings-menu"
-  xdotool mousemove 99 316 click 1
+  # Settings is the last Edit menu entry; Zotero 10 inserts Advanced Search above it.
+  xdotool key End Return
   wait_for_window "Zotero Settings" 30 || fail "Zotero Settings did not open from provider tip or Edit -> Settings."
 else
   capture_ui "09-provider-tip-opened-settings"
@@ -750,7 +756,9 @@ focus_window "Zotero Settings"
 sleep 2
 capture_ui "10-settings-general"
 focus_window "Zotero Settings"
-xdotool mousemove 337 459 click 1
+# Preferences opens centered on the desktop. Use its own origin for the sidebar.
+settings_window_id="$(wmctrl -l | grep -E 'Zotero Settings' | awk '{print $1; exit}')"
+xdotool mousemove --window "$settings_window_id" 80 320 click 1
 sleep 1
 capture_ui "11-zotextract-settings-empty"
 
@@ -789,6 +797,12 @@ focus_main_window
 sleep 1
 capture_ui "14c-papers-return"
 : > "$ARTIFACTS/ui-shell-papers-return-captured.json"
+
+wait_for_file "$ARTIFACTS/ui-stage-collection-session-actions-covered.json" 120 || fail "ZotExtract collection session actions did not complete."
+focus_main_window
+sleep 1
+capture_ui "14d-collection-session"
+: > "$ARTIFACTS/ui-shell-collection-session-captured.json"
 
 wait_for_file "$ARTIFACTS/ui-stage-question-picker-visible.json" 120 || fail "ZotExtract Pick Extractions view did not open."
 focus_main_window
@@ -936,7 +950,7 @@ fi
 
 echo >> "$report"
 echo "## Zotero GUI lifecycle E2E" >> "$report"
-echo "The run installed ZotExtract through Plugins Manager -> Install Plugin From File or the isolated-profile fallback, verified the provider setup tip, configured provider fields through ZotExtract Settings, captured the Sessions list, empty matrix, return-to-library and return-to-collection states, Pick Extractions, Add Papers, and native PDF evidence screens, opened single and multiple paper ZotExtract sessions from the item context menu, verified answer-only result cells and session exports, and removed ZotExtract through the Plugins Manager or isolated-profile cleanup." >> "$report"
+echo "The run installed ZotExtract through Plugins Manager -> Install Plugin From File or the isolated-profile fallback, verified the provider setup tip, opened ZotExtract Settings, configured the deterministic provider in the runtime harness, captured the Sessions list, empty matrix, collection actions, return-to-library and return-to-collection states, Pick Extractions, Add Papers, and native PDF evidence screens, opened single and multiple paper ZotExtract sessions from the item context menu, verified answer-only result cells and session exports, and removed ZotExtract through the Plugins Manager or isolated-profile cleanup." >> "$report"
 echo "Extension install check: extension-check.json" >> "$report"
 echo "Preference setup check: preferences-check.json" >> "$report"
 echo "Runtime extraction/export check: runtime-check.json and runtime-e2e-result.json" >> "$report"

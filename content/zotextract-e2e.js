@@ -78,6 +78,11 @@ var ZotExtractE2E = {
             this.assertEmptySessionVisible(win);
             await this.assertCollectionClickReturnsToZotero(win, artifactDir, /(^|\s)papers($|\s)/i);
             await this.waitForArtifactFile(artifactDir, 'ui-shell-papers-return-captured.json', 120);
+            result.collectionActions = await this.assertCollectionSessionActions(win, items);
+            result.steps.push('collection-session-actions-covered');
+            await this.writeStage(artifactDir, 'collection-session-actions-covered', result.collectionActions);
+            await this.waitForArtifactFile(artifactDir, 'ui-shell-collection-session-captured.json', 120);
+            await pane.collectionsView.selectLibrary(Zotero.Libraries.userLibraryID);
             await ZotExtract.openSessionsTab(win, draftSession.id);
             this.assertEmptySessionVisible(win);
 
@@ -750,12 +755,68 @@ var ZotExtractE2E = {
         return items;
     },
 
-    async ensurePapersCollection(items) {
+    async assertCollectionSessionActions(win, items) {
+        const pane = Zotero.getActiveZoteroPane();
+        const firstItems = items.slice(0, 2);
+        const secondItems = items.slice(1, 3);
+        const expectedIDs = [...new Set([...firstItems, ...secondItems].map(item => item.id))];
+        const first = await this.ensurePapersCollection(firstItems, 'Collection action A');
+        const second = await this.ensurePapersCollection(secondItems, 'Collection action B');
+        const startMenu = win.document.getElementById('zotero-collectionmenu-zotextract-start');
+        const addMenu = win.document.getElementById('zotero-collectionmenu-zotextract-add');
+        if (!startMenu || !addMenu) throw new Error('ZotExtract collection menu actions are missing.');
+
+        const checkPapers = (session, expected) => {
+            const ids = session.paperItemIds || [];
+            if (ids.length !== expected.length || expected.some(id => !ids.includes(id))) {
+                throw new Error(`Collection action returned papers ${ids}, expected ${expected}.`);
+            }
+        };
+        ZotExtract.closeSessionsTab(win);
+        await pane.collectionsView.selectCollection(first.id);
+        const beforeSingle = (await ZotExtract.loadSessions()).map(session => session.id);
+        startMenu.doCommand();
+        const single = await this.waitForSessionForItems(firstItems.map(item => item.id), beforeSingle);
+        checkPapers(single, firstItems.map(item => item.id));
+        const checks = { singleCollection: true, addCollection: false, multipleCollections: null };
+
+        ZotExtract.closeSessionsTab(win);
+        await pane.collectionsView.selectCollection(second.id);
+        addMenu.doCommand();
+        let added;
+        for (let i = 0; i < 60; i++) {
+            added = await ZotExtract.getSession(single.id);
+            if (expectedIDs.every(id => added.paperItemIds.includes(id))) break;
+            await this.delay(250);
+        }
+        checkPapers(added, expectedIDs);
+        checks.addCollection = true;
+
+        if (typeof pane.getSelectedCollections === 'function') {
+            ZotExtract.closeSessionsTab(win);
+            await pane.collectionsView.selectCollection(first.id);
+            const secondIndex = pane.collectionsView.getRowIndexByID(`C${second.id}`);
+            if (secondIndex === false) throw new Error('Second collection is missing from the collection tree.');
+            pane.collectionsView.selection.toggleSelect(secondIndex);
+            await this.delay(500);
+            if (pane.getSelectedCollections().length !== 2) throw new Error('Could not select two collections in Zotero.');
+            const beforeMulti = (await ZotExtract.loadSessions()).map(session => session.id);
+            startMenu.doCommand();
+            const multi = await this.waitForSessionForItems(expectedIDs, beforeMulti);
+            checkPapers(multi, expectedIDs);
+            checks.multipleCollections = true;
+            checks.multiSessionId = multi.id;
+        }
+        checks.paperItemIDs = expectedIDs;
+        return checks;
+    },
+
+    async ensurePapersCollection(items, name = 'papers') {
         try {
             if (!Zotero.Collection || !items?.length) return null;
             const collection = new Zotero.Collection();
             collection.libraryID = Zotero.Libraries.userLibraryID;
-            collection.name = 'papers';
+            collection.name = name;
             await collection.saveTx();
             const itemIDs = items.map(item => item.id).filter(Boolean);
             if (Zotero.DB?.executeTransaction && typeof collection.addItems === 'function') {

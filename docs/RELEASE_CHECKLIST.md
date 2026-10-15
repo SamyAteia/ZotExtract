@@ -10,6 +10,7 @@ Use this checklist before publishing a ZotExtract `.xpi` release.
 - Zotero 7 smoke passes: `bash scripts/run-zotero-version-smoke.sh 7.0.32`.
 - Zotero 8 smoke passes: `bash scripts/run-zotero-version-smoke.sh 8.0.4`.
 - Zotero 9 smoke passes: `bash scripts/run-zotero-version-smoke.sh 9.0.4`.
+- Zotero 10 smoke passes: `bash scripts/run-zotero-version-smoke.sh 10.0.6`, including single-collection and multiple-collection session actions.
 - The public `zotextract.xpi` does not include `content/zotextract-e2e.js`; only the Docker workflow opts into that harness.
 - Docker artifacts include screenshots for install or isolated-profile install fallback, provider settings, sessions tab, empty/ready/completed session matrix, session export, and uninstall.
 - Docker GUI lifecycle asserts and screenshots the first-install provider setup tip.
@@ -27,6 +28,9 @@ npm run release:github
 ```
 
 Use `npm run release:github -- --dry-run` to preview the `gh release create` command and the changelog section that will be used as release notes.
+Dry runs validate the package and update manifest before a release tag exists. Publication still requires the local and remote tag.
+
+The release script prepends download and Zotero installation instructions to both changelog-derived and custom release notes. Confirm that the release page tells Firefox users to right-click `zotextract.xpi` under **Assets** and choose **Save Link As…** before installing the saved file in Zotero. A normal click may trigger Firefox's browser-extension installer and an unsigned-add-on warning.
 
 ## Privacy and data handling
 

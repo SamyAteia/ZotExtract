@@ -562,11 +562,19 @@ var ZotExtractProviderRuntime = {
         },
 
         lineCitationPattern() {
-            const prefix = '(?:L|Line|Lines|Line\\s+No\\.?|Line\\s+Number|Line\\s+Numbers)';
+            const prefix = '(?:Line[ \\t]+Numbers?|Line[ \\t]+No\\.?|Lines?|L)';
+            const space = '[ \\t]*';
+            const marker = `${prefix}\\.?${space}[:#]?${space}`;
             const separator = '(?:[-–]|to|through|thru|and)';
+            // A short number after a dash can start the note (e.g. "32. Team"
+            // or "48 participants"), not a range. Require a marked/padded end
+            // ID, or an explicit word separator such as "through".
+            const rangeAhead = `(?=${space}${separator}${space}(?:${marker}\\d{1,6}|\\d{6})\\b`
+                + `|[ \\t]+(?:to|through|thru)[ \\t]+\\d{1,6}\\b)`;
+            const rangeEnd = `(?:${rangeAhead}${space}${separator}${space}(?:${marker})?(\\d{1,6}))?`;
             return new RegExp(
-                `\\b(?:${prefix})\\.?\\s*[:#]?\\s*(\\d{1,6})(?:\\s*${separator}\\s*(?:(?:${prefix})\\.?\\s*[:#]?\\s*)?(\\d{1,6}))?\\b`
-                    + `|\\b(\\d{6})(?:\\s*${separator}\\s*(?:L\\.?\\s*)?(\\d{1,6}))?\\b`,
+                `\\b${marker}(\\d{1,6})${rangeEnd}\\b`
+                    + `|\\b(\\d{6})${rangeEnd}\\b`,
                 'gi'
             );
         },

@@ -40,6 +40,7 @@ async function startup({ id, version, resourceURI, rootURI }) {
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-window.js');
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-data.js');
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-context.js');
+        Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-quote-recovery.js');
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-runner.js');
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-window-ui.js');
         Services.scriptloader.loadSubScript(rootURI + 'content/zotextract-session-ui.js');

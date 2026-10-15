@@ -17,6 +17,7 @@ The extraction path is split across these runtime files:
 | `content/zotextract.js` | Base ZotExtract object, shared defaults, prompt templates, and preference keys. |
 | `content/zotextract-data.js` | Question sets, sessions, local JSON storage, and session edit helpers. |
 | `content/zotextract-context.js` | Zotero item metadata, PDF text extraction, line numbering, token budgets, and evidence windows. |
+| `content/zotextract-quote-recovery.js` | Verbatim quotation matching and correction of evidence line ranges. |
 | `content/zotextract-runner.js` | Session run planning, extraction cell execution, retries, cancellation, and progress state. |
 | `content/zotextract-session-ui.js` | Session list, workspace table, result cells, and context summaries. |
 | `content/zotextract-evidence-ui.js` | Result actions, PDF evidence opening, table resizing, and question picker interactions. |
@@ -100,6 +101,35 @@ or provider limits force a fallback, ZotExtract answers from Zotero item details
 warning on the result.
 
 The full-text character cap defaults to 400,000 characters and is configurable in Settings.
+
+### Source-backed quotation recovery
+
+The evidence pass may quote a complete passage while citing only its first line, or use an
+incorrect line number. Before building the answer context, ZotExtract searches the paper's
+source text for each sufficiently long quotation (at least 24 characters and four words).
+Matching preserves wording and case. It normalizes whitespace, Unicode compatibility forms
+(including PDF ligatures), typographic quotation marks and dashes, an optional final period,
+and PDF line-wrap hyphen spacing. It does not use fuzzy or semantic similarity.
+
+A unique match replaces the proposed citation with the complete source range. If a quotation
+occurs more than once, an existing citation may disambiguate it only when exactly one matching
+range overlaps that citation. Otherwise no corrected range is guessed. A quotation without a
+line ID can also be recovered when its match is unambiguous.
+
+When a note cannot be matched, valid cited source lines may still be retained, but the note
+itself is never forwarded as source evidence. Entries with neither usable citations nor a
+recoverable quotation are discarded. Final prompts contain the original source lines, not
+model-rewritten quotations. Per-window recovery diagnostics record the original and corrected
+ranges. Existing context-budget limits and the full-context fallback after an empty evidence
+pass continue to apply.
+
+Citation ranges must have an explicit end line marker (for example, `L12-L15`),
+a six-digit end ID (`L000012-000015`), or a word separator (`lines 12 through 15`).
+A short number after a dash is note text: `L008251 - 32. Team, D., ...` cites only
+`L008251`, not every line between 32 and 8251. Citation parsing does not cross newlines.
+When a quotation cannot be verified, the citation is intersected with its original
+scan window before source text is collected. Only a verified quotation may recover
+a source span outside that window.
 
 ## Provider Calls
 
