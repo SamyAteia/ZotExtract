@@ -234,7 +234,11 @@ trigger_zotextract_from_context_menu() {
   local name="$1"
   local row_y="${2:-183}"
   local action_y="${3:-516}"
-  xdotool mousemove 330 "$row_y" click 3
+  local row_x=330
+  if [ -n "${4:-}" ]; then
+    read -r row_x row_y < <(node -e 'const p = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).details.contextMenuTarget; console.log(p.x, p.y)' "$4")
+  fi
+  xdotool mousemove "$row_x" "$row_y" click 3
   sleep 1
   capture_ui "$name-context-menu"
   # The ZotExtract actions sit at the bottom of Zotero's item context menu, but
@@ -774,6 +778,12 @@ sleep 1
 focus_main_window
 xdotool key Escape
 
+for state in collapsed expanded nested recollapsed; do
+  wait_for_file "$ARTIFACTS/ui-stage-sidebar-$state.json" 120 || fail "Library sidebar $state layout check did not complete."
+  capture_ui "12b-sidebar-$state"
+  touch "$ARTIFACTS/ui-shell-sidebar-$state-captured.json"
+done
+
 wait_for_file "$ARTIFACTS/ui-stage-sessions-list-visible.json" 120 || fail "ZotExtract Sessions list did not open."
 focus_main_window
 sleep 1
@@ -824,7 +834,7 @@ log "Starting single-PDF ZotExtract session through the item context menu"
 if [ "$DIRECT_SESSION_START" = "1" ]; then
   log "Using direct E2E session start for single-paper fixture run"
 else
-  trigger_zotextract_from_context_menu "21-single" "$single_row_y" "$single_action_y"
+  trigger_zotextract_from_context_menu "21-single" "$single_row_y" "$single_action_y" "$ARTIFACTS/ui-stage-single-ready.json"
 fi
 wait_for_file "$ARTIFACTS/ui-stage-single-session-opened.json" 120 || fail "Single ZotExtract session did not open."
 focus_main_window
@@ -850,7 +860,7 @@ log "Starting multi-PDF ZotExtract session through the item context menu"
 if [ "$DIRECT_SESSION_START" = "1" ]; then
   log "Using direct E2E session start for multi-paper fixture run"
 else
-  trigger_zotextract_from_context_menu "25-multiple" "$multi_row_y" "$multi_action_y"
+  trigger_zotextract_from_context_menu "25-multiple" "$multi_row_y" "$multi_action_y" "$ARTIFACTS/ui-stage-multi-ready.json"
 fi
 wait_for_file "$ARTIFACTS/ui-stage-multi-session-opened.json" 120 || fail "Multiple ZotExtract session did not open."
 focus_main_window
@@ -862,6 +872,20 @@ focus_main_window
 sleep 1
 capture_ui "27-multiple-session-completed"
 : > "$ARTIFACTS/ui-shell-multi-session-completed-captured.json"
+
+case "${ZOTERO_VERSION:-}" in
+  8.*|9.*|10.*)
+    for stage in session-overview-in-library multiple-session-tabs; do
+      wait_for_file "$ARTIFACTS/ui-stage-$stage.json" 120 || fail "Session tab navigation check $stage did not complete."
+      capture_ui "$stage"
+      touch "$ARTIFACTS/ui-shell-$stage-captured.json"
+    done
+    wait_for_window 'Delete ZotExtract session' 30 || fail "Fixture session delete confirmation did not open."
+    capture_ui "session-delete-confirmation"
+    focus_window 'Delete ZotExtract session'
+    xdotool key Return
+    ;;
+esac
 
 wait_for_file "$ARTIFACTS/runtime-e2e-result.json" 60 || fail "Runtime GUI lifecycle result was not written."
 verify_runtime_result > "$ARTIFACTS/runtime-check.json" || fail "Runtime GUI lifecycle verification failed. See runtime-e2e-result.json."

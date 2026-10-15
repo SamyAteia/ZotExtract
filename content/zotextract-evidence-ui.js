@@ -236,8 +236,20 @@ var ZotExtractEvidenceUI = {
             }
             if (!reader) return;
             try {
+                await reader._initPromise;
+                const view = reader._internalReader?._lastView || reader._internalReader?._primaryView;
+                await view?.initializedPromise;
+                const pdfViewer = view?._iframeWindow?.PDFViewerApplication?.pdfViewer;
+                const pageIndex = location.position?.pageIndex ?? location.pageIndex;
+                // Zotero 7 resolves the reader promise before PDF.js creates its pages.
+                if (pdfViewer?.getPageView && Number.isInteger(pageIndex)) {
+                    for (let attempt = 0; attempt < 100 && !pdfViewer.getPageView(pageIndex); attempt++) {
+                        await Zotero.Promise.delay(50);
+                    }
+                    if (!pdfViewer.getPageView(pageIndex)) return;
+                }
                 if (typeof reader.navigate === 'function') {
-                    reader.navigate(location);
+                    await reader.navigate(location);
                 }
                 this.extendEvidencePdfSpotlight(reader, location);
             } catch (e) {
@@ -249,7 +261,7 @@ var ZotExtractEvidenceUI = {
             try {
                 if (typeof Zotero.Reader?.open === 'function') {
                     const win = this.mainWindow(window);
-                    this.closeSessionsTab(win);
+                    if (!this.nativeSessionTab(win)) this.closeSessionsTab(win);
                     const reader = await Zotero.Reader.open(Number(attachmentId), location || null, {});
                     if (location) {
                         if (reader) this.extendEvidencePdfSpotlight(reader, location);
@@ -293,9 +305,11 @@ var ZotExtractEvidenceUI = {
         },
 
         async openQuestionPicker(sessionId, window) {
-            const win = this.selectLibraryTab(window);
-            const panel = win?.document?.getElementById('zotextract-sessions-panel');
+            const win = this.mainWindow(window);
+            const panel = this.sessionWorkspacePanel(win, sessionId);
             if (!panel) return;
+            panel._zotextractRenderVersion = (panel._zotextractRenderVersion || 0) + 1;
+            panel.removeAttribute?.('data-ze-workspace-session');
             const session = await this.getSession(sessionId);
             if (!session) return;
             let questionSets = await this.loadQuestionSets();

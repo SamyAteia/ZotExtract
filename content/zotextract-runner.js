@@ -367,7 +367,7 @@ var ZotExtractRunner = {
             this.markSessionExportStale(session);
             session.questionSnapshots = questions.map(question => ({ ...question, snapshottedAt: this.nowIso() }));
             session = await this.saveSession(session);
-            await this.renderSessionWorkspace(session.id);
+            await this.refreshSessionWorkspace(session.id);
 
             const concurrencyPlan = await this.planRunConcurrency(provider, jobs);
             const concurrency = Math.min(concurrencyPlan.concurrency, Math.max(1, jobs.length));
@@ -465,7 +465,7 @@ var ZotExtractRunner = {
             session = await this.saveSession(session);
             this.activeSessionRuns.delete(session.id);
             this.finishSessionProgress(runState.cancelled, runState.progress.paperDone, failed, review, runState.progress.paperTotal);
-            await this.renderSessionWorkspace(session.id);
+            await this.refreshSessionWorkspace(session.id);
             return { session, cells };
         },
 
@@ -589,7 +589,7 @@ var ZotExtractRunner = {
             session = await this.saveSession(session);
             this.activeSessionRuns.delete(session.id);
             this.finishSessionProgress(runState.cancelled, runState.progress.paperDone, failed, review, runState.progress.paperTotal);
-            await this.renderSessionWorkspace(session.id);
+            await this.refreshSessionWorkspace(session.id);
             return { session, cells, cell: completedCell };
         },
 

@@ -84,6 +84,19 @@ Leave the API key empty if your local server doesn't require one.
 6. Run the session. ZotExtract uses Zotero item details and PDF text when available.
 7. Review the completed table, open cited PDF locations when available, and export the results.
 
+The session overview and its status filters stay in the library beside the sidebar.
+In Zotero 8–10, opening a specific session creates a tab beside your PDFs. You can keep several
+sessions open; opening the same session again selects its existing tab. Each session keeps its
+own grid and scroll position, and extraction updates do not switch away from the PDF you are reading.
+**Back to sessions** returns to the library overview while keeping the session tab open.
+Closing the tab keeps the saved session; reopen it from **My ZotExtract Sessions** in the library.
+Saved sessions also remain available there after restarting Zotero. Zotero 7 keeps
+the library-based session view.
+
+GPT-6 models use `max_completion_tokens` on the OpenAI endpoint. If reasoning is set to
+**None**, GPT-6 Astra and GPT-6.1 Sol use **Low**, their lowest supported effort. **Minimal**
+also uses **Low** for GPT-6 models.
+
 ### Built-In Question Sets
 
 ZotExtract ships with question sets for Overview & Scope, Methods & Data, Results & Evaluation, Limitations & Critique, and Reproducibility. They are designed for comparing the same question across multiple papers.

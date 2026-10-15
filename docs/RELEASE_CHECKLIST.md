@@ -46,6 +46,8 @@ The release script prepends download and Zotero installation instructions to bot
 - Provider setup is clear for both local and hosted endpoints, including useful discovery feedback and actionable errors when a model server is unavailable.
 - Settings keep common provider and safety options easy to find, while advanced tuning stays available without dominating the first-use flow.
 - Session screens remain readable with realistic paper/question counts and keep technical diagnostics compact.
+- On Zotero 8–10, individual sessions open in separate native tabs while the overview and status filters remain in the library. Switching to a PDF and back preserves the session view and scroll position.
+- Install an update while Zotero is running and verify that session styles refresh without a restart. Empty, one-paper, and three-paper sessions must fill the available tab width at narrow and maximized window sizes.
 - Results prioritize the final answer while keeping evidence, reasoning, source details, and PDF navigation available when relevant.
 - Built-in questions and prompts are public-facing, domain-focused, and free of implementation artifacts, internal terminology, or hidden response-mode details.
 - Batch runs, skipped items, failures, and exports report enough context for a user to decide what to do next.

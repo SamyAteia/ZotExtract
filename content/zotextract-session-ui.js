@@ -1,8 +1,14 @@
 var ZotExtractSessionUI = {
         async renderSessionsList(window) {
-            const win = this.selectLibraryTab(window);
+            const win = this.mainWindow(window);
+            this.selectLibraryTab(win);
             const panel = win?.document?.getElementById('zotextract-sessions-panel');
             if (!panel) return;
+            panel.removeAttribute?.('data-ze-workspace-session');
+            delete panel._zotextractScroll;
+            panel.setAttribute('data-ze-open', 'true');
+            this.syncLibrarySessionsVisibility(win);
+            this.positionSessionsPanel(win);
             this.renderLibrarySessionsNav(win);
             const allSessions = await this.loadSessions();
             const filter = this.sessionFilter || 'all';
@@ -57,7 +63,7 @@ var ZotExtractSessionUI = {
                 input.setSelectionRange?.(end, end);
             }
             panel.querySelector('[data-ze-new-session]')?.addEventListener('click', event => !this.actionDisabled(event.currentTarget) && this.startEmptySession());
-            panel.querySelector('[data-ze-open-detail]')?.addEventListener('click', () => selected && this.renderSessionWorkspace(selected.id, win));
+            panel.querySelector('[data-ze-open-detail]')?.addEventListener('click', () => selected && this.openSessionsTab(win, selected.id));
             panel.querySelector('[data-ze-rename-detail]')?.addEventListener('click', event => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -76,7 +82,7 @@ var ZotExtractSessionUI = {
                     this.currentSessionId = row.getAttribute('data-ze-session-row');
                     this.renderSessionsList(win);
                 });
-                row.addEventListener('dblclick', () => this.renderSessionWorkspace(row.getAttribute('data-ze-session-row'), win));
+                row.addEventListener('dblclick', () => this.openSessionsTab(win, row.getAttribute('data-ze-session-row')));
             });
         },
 
@@ -263,13 +269,22 @@ var ZotExtractSessionUI = {
             return Number.isFinite(number) ? number.toLocaleString() : '0';
         },
 
+        async refreshSessionWorkspace(sessionId) {
+            for (const win of this.mainLibraryWindows()) {
+                const panel = this.sessionWorkspacePanel(win, sessionId);
+                if (panel?.getAttribute?.('data-ze-open') !== 'true' || panel.getAttribute?.('data-ze-workspace-session') !== sessionId) continue;
+                await this.renderSessionWorkspace(sessionId, win);
+            }
+        },
+
         async renderSessionWorkspace(sessionId, window, contextDiagnostics = null) {
-            const win = this.selectLibraryTab(window);
-            const panel = win?.document?.getElementById('zotextract-sessions-panel');
+            const win = this.mainWindow(window);
+            const panel = this.sessionWorkspacePanel(win, sessionId);
             if (!panel) return;
+            const renderVersion = (panel._zotextractRenderVersion || 0) + 1;
+            panel._zotextractRenderVersion = renderVersion;
             const session = await this.getSession(sessionId);
-            if (!session) return this.renderSessionsList(win);
-            this.currentSessionId = session.id;
+            if (!session) return;
             const questions = await this.resolveQuestionRefs(session.questionRefs);
             const cells = await this.readResultCells(session.id);
             const papers = [];
@@ -277,9 +292,17 @@ var ZotExtractSessionUI = {
                 const item = await this.getItemById(itemId);
                 if (item) papers.push(item);
             }
+            if (this.sessionWorkspacePanel(win, sessionId) !== panel || panel._zotextractRenderVersion !== renderVersion) return;
             const provider = this.getProviderSettings();
             const diagnosticsReady = contextDiagnostics instanceof Map;
             const diagnostics = diagnosticsReady ? contextDiagnostics : new Map();
+            const oldWrap = panel.querySelector?.('.ze-matrix-wrap');
+            const sameSession = panel.getAttribute?.('data-ze-workspace-session') === sessionId;
+            const scroll = sameSession && oldWrap
+                ? (this.sessionPanelIsSelected(win, panel) ? { left: oldWrap.scrollLeft, top: oldWrap.scrollTop } : panel._zotextractScroll) : null;
+            panel._zotextractScroll = scroll;
+            panel.setAttribute?.('data-ze-workspace-session', sessionId);
+            this.updateSessionTabTitle(win, session);
             this.setInnerHTML(panel, `
                 <div class="ze-windowbar"><span class="ze-window-title" data-ze-session-name-host data-ze-session-id="${this.htmlEscape(session.id)}"><span>ZotExtract Session - </span><span data-ze-session-name>${this.htmlEscape(session.name)}</span>${this.actionHtml('✎', 'data-ze-rename-session title="Rename session"', 'ze-icon-btn ze-rename-icon')}</span><span>${questions.length} question${questions.length === 1 ? '' : 's'} x ${papers.length} paper${papers.length === 1 ? '' : 's'}</span></div>
                 <div class="ze-toolbar">
@@ -302,7 +325,7 @@ var ZotExtractSessionUI = {
                     </div>
                 </div>`);
             if (!panel.querySelector) return;
-            panel.querySelector('[data-ze-back]')?.addEventListener('click', () => this.renderSessionsList(win));
+            panel.querySelector('[data-ze-back]')?.addEventListener('click', () => this.openSessionsTab(win));
             panel.querySelector('[data-ze-rename-session]')?.addEventListener('click', event => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -313,11 +336,17 @@ var ZotExtractSessionUI = {
             panel.querySelector('[data-ze-run-footer]')?.addEventListener('click', event => !this.actionDisabled(event.currentTarget) && this.runSession(session.id));
             panel.querySelector('[data-ze-export]')?.addEventListener('click', event => !this.actionDisabled(event.currentTarget) && this.exportSession(session.id, win));
             this.attachMatrixResizers(panel, session);
-            if (cells.some(cell => cell.status === 'completed' || cell.status === 'needs-review')) {
+            if (scroll) {
+                if (this.sessionPanelIsSelected(win, panel)) this.restoreSessionView(panel);
+            } else if (cells.some(cell => cell.status === 'completed' || cell.status === 'needs-review')) {
                 this.scrollFirstResultIntoView(panel);
             }
+            const wrap = panel.querySelector('.ze-matrix-wrap');
+            wrap?.addEventListener('scroll', () => {
+                if (this.sessionPanelIsSelected(win, panel)) panel._zotextractScroll = { left: wrap.scrollLeft, top: wrap.scrollTop };
+            });
             if (!diagnosticsReady) {
-                this.refreshContextDiagnostics(session.id, win, papers, provider, questions);
+                this.refreshContextDiagnostics(session.id, win, papers, provider, questions, renderVersion);
             }
         },
 
@@ -338,7 +367,7 @@ var ZotExtractSessionUI = {
                 </div>`;
         },
 
-        async refreshContextDiagnostics(sessionId, win, papers, provider, questions) {
+        async refreshContextDiagnostics(sessionId, win, papers, provider, questions, renderVersion) {
             const diagnostics = new Map();
             await Promise.all((papers || []).map(async item => {
                 try {
@@ -349,7 +378,8 @@ var ZotExtractSessionUI = {
                     });
                 }
             }));
-            if (this.currentSessionId !== sessionId) return;
+            const panel = this.sessionWorkspacePanel(win, sessionId);
+            if (panel?._zotextractRenderVersion !== renderVersion || panel?.getAttribute('data-ze-workspace-session') !== sessionId) return;
             await this.renderSessionWorkspace(sessionId, win, diagnostics);
         },
 
@@ -427,15 +457,17 @@ var ZotExtractSessionUI = {
         },
 
         updateOpenResultCell(sessionId, cell) {
-            if (!cell || this.currentSessionId !== sessionId) return;
-            const doc = this.mainWindow()?.document;
-            const panel = doc?.getElementById?.('zotextract-sessions-panel');
-            if (!panel || panel.getAttribute?.('data-ze-open') !== 'true') return;
-            const key = `${cell.itemId}:${cell.questionId}`;
-            const target = panel.querySelector?.(`[data-ze-result-cell-key="${this.cssEscape(key)}"] .ze-cell-content`);
-            if (!target) return;
-            this.setInnerHTML(target, this.renderSessionCellContent(cell));
-            this.attachResultCellActions(panel, sessionId);
+            if (!cell) return;
+            for (const win of this.mainLibraryWindows()) {
+                const panel = this.sessionWorkspacePanel(win, sessionId);
+                if (!panel || panel.getAttribute?.('data-ze-open') !== 'true') continue;
+                if (!this.nativeSessionTab(win, sessionId) && this.currentSessionId !== sessionId) continue;
+                const key = `${cell.itemId}:${cell.questionId}`;
+                const target = panel.querySelector?.(`[data-ze-result-cell-key="${this.cssEscape(key)}"] .ze-cell-content`);
+                if (!target) continue;
+                this.setInnerHTML(target, this.renderSessionCellContent(cell));
+                this.attachResultCellActions(panel, sessionId);
+            }
         },
 
         cssEscape(value) {

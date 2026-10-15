@@ -113,6 +113,11 @@ on Zotero 10, starts a session from two selected collections. The resulting pape
 the selection without duplicates. Evidence is recorded in `collectionActions` in the runtime
 result and `ui-14d-collection-session.png`.
 
+Sidebar coverage clicks the native library disclosure control to collapse, expand, and collapse
+again, and expands a nested collection. Each state measures the sessions section against the
+last row in Zotero's collection model, checks for overlap, and captures a `ui-12b-sidebar-*.png`
+screenshot. Measurements are recorded in `librarySidebar` in the runtime result.
+
 To run the real Zotero GUI lifecycle independently of the Node mock tests, set
 `ZOTEXTRACT_SKIP_UNIT_TESTS=1`. The report explicitly records the skipped gate; this is not a
 passing full release gate. Leave the variable unset for release verification.
@@ -147,6 +152,17 @@ Desktop WSL integration and rerun it.
 12. Confirm the context-size row shows direct/two-pass versus sliding evidence mode, evidence-window count, active per-request token limit, and average extraction time after a completed run.
 13. Confirm completed results return sectioned output with `## reasoning`, `## context`, and `## answer`, while the session grid displays the final answer first with collapsed evidence/reasoning details.
 14. When a result cell shows a **PDF** evidence action, open it and confirm Zotero's native PDF reader opens for the cited evidence location.
+    In Zotero 8–10, confirm the named session tab remains visible. Click it to return to the
+    same grid and scroll position. Repeat while the session updates, and verify updates do
+    not select the session tab while you are reading. Close and reopen the tab from the
+    library, then confirm the saved session and results are still available.
+    Open Zotero's all-tabs menu, filter for the session, and select it from the menu.
+    Check the Zotero log for tab-menu errors and PDF-reader readiness errors.
+    Open a second session and switch between both named tabs and a PDF. Verify separate grids
+    and scroll positions, reopening an existing session without duplicating its tab, and keeping
+    a question picker open while another session updates. **Back to sessions** and all five status
+    filters must show the overview beside the library sidebar without creating tabs. Close one
+    session tab and reopen it; deleting a session must close only that session's tab.
 15. Confirm full-text results cite line IDs such as `L000123`; all full-text papers should first scan line-numbered evidence context, with oversized papers using overlapping windows, and then answer from the collected evidence.
 16. Open advanced settings and confirm reasoning effort defaults to **None**, remains configurable, and the full-text character cap defaults to 400,000 and is editable.
 17. Confirm the final-answer and evidence-collection prompt templates are editable and use `{{question}}` / `{{context}}` placeholders.
@@ -157,10 +173,28 @@ Desktop WSL integration and rerun it.
 
 ### Optional: verifying against a real model server
 
+The fake provider rejects unsupported GPT-6 completion-token, temperature, and reasoning
+parameters and logs request settings without messages or authorization headers. To exercise
+OpenAI-specific request handling locally, set `ZOTEXTRACT_PROVIDER_NAME=OpenAI`, use a test
+hostname mapped to loopback for `ZOTEXTRACT_PROVIDER_BASE_URL`, and set
+`ZOTEXTRACT_PROVIDER_MODEL=gpt-6-astra`. A literal localhost URL intentionally selects the
+local-provider compatibility path. The GUI harness also checks the GPT-6 variants with
+none/minimal/medium reasoning and the existing GPT-5 and GPT-4 request paths in this mode.
+These checks validate request compatibility against the mock; they do not evaluate hosted
+model answers.
+
 Real-model verification uses the installed plugin. Point the ZotExtract API base URL at any
 OpenAI-compatible endpoint (LM Studio, Ollama, llama.cpp, Jan, or a hosted provider), and run a
 session following the manual smoke test. The mocked Docker lifecycle (#3) remains the automated
 release gate.
+
+## Session layout after updates
+
+Install an updated build while Zotero is running. Open a specific session and confirm its
+header, toolbar, workspace, and footer fill the native tab content area. Check empty,
+one-paper, and three-paper sessions at narrow and maximized window sizes, including the
+question picker and the return to the library overview. The stylesheet URL changes when
+ZotExtract loads, preventing Zotero from reusing styles from the previous build.
 
 ## Privacy checks
 

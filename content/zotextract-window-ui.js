@@ -47,6 +47,200 @@ var ZotExtractWindowUI = {
             return win;
         },
 
+        installNativeSessionTabMenu(window) {
+            const tabs = window.Zotero_Tabs;
+            const menu = tabs.tabsMenuPanel;
+            const refreshList = menu.refreshList;
+            const doc = window.document;
+            const refreshWithSession = function (options = {}) {
+                const allTabs = tabs._tabs;
+                const sessionTabs = allTabs.filter(tab => tab.type === 'zotextract');
+                if (!this.visible || !sessionTabs.length) return refreshList.call(this, options);
+                const selectedID = (!options.ignorePreviousSelection && this.tabsList.querySelector('.selected')?.dataset.tabId) || tabs.selectedID;
+                // Zotero's menu looks up an item icon for every non-library tab.
+                // Render its item rows normally, then insert the session rows.
+                try {
+                    tabs._tabs = allTabs.filter(tab => tab.type !== 'zotextract');
+                    refreshList.call(this, options);
+                } finally {
+                    tabs._tabs = allTabs;
+                }
+                const matchingSessions = sessionTabs.filter(tab => tab.title.toLowerCase().includes(this._filterText));
+                if (!matchingSessions.length) return;
+                const make = (tag, className) => {
+                    const node = doc.createElementNS('http://www.w3.org/1999/xhtml', tag);
+                    node.setAttribute('class', className);
+                    return node;
+                };
+                for (const sessionTab of matchingSessions) {
+                    this.tabsList.querySelector('#zotero-tabs-menu-row-empty')?.remove();
+                    const row = make('div', 'row');
+                    row.id = `zotero-tabs-menu-row-${sessionTab.id}`;
+                    row.dataset.tabId = sessionTab.id;
+                    row.setAttribute('role', 'option');
+                    row.setAttribute('draggable', 'true');
+                    const title = make('div', 'zotero-tabs-menu-entry title');
+                    title.setAttribute('flex', '1');
+                    title.setAttribute('tabindex', '-1');
+                    title.setAttribute('aria-label', sessionTab.title);
+                    title.setAttribute('title', sessionTab.title);
+                    title.appendChild(make('span', 'icon icon-css icon-collection tab-icon'));
+                    title.appendChild(this.createLabel(sessionTab.title));
+                    title.addEventListener('click', this._handleTitleClick);
+                    const close = make('div', 'zotero-tabs-menu-entry close');
+                    close.setAttribute('role', 'button');
+                    close.setAttribute('tabindex', '-1');
+                    close.dataset.l10nId = 'tabs-menu-close-button';
+                    close.appendChild(make('span', 'icon icon-css icon-x-8 icon-16'));
+                    close.addEventListener('click', this._handleCloseClick);
+                    row.append(title, close);
+                    for (const [event, handler] of [['dragstart', '_handleRowDragStart'], ['dragover', '_handleRowDragOver'], ['drop', '_handleRowDrop'], ['dragend', '_handleRowDragEnd']]) {
+                        row.addEventListener(event, this[handler]);
+                    }
+                    const position = allTabs.indexOf(sessionTab);
+                    const next = Array.from(this.tabsList.children).find(node => allTabs.findIndex(tab => tab.id === node.dataset.tabId) > position);
+                    this.tabsList.insertBefore(row, next || null);
+                }
+                const rows = Array.from(this.tabsList.children);
+                rows.forEach((node, index) => {
+                    node.setAttribute('index', index);
+                    node.dataset.l10nId = 'tabs-menu-row';
+                    node.dataset.l10nArgs = JSON.stringify({ title: node.querySelector('.title')?.getAttribute('title'), index: index + 1, total: rows.length, isFirst: index === 0, isLast: index === rows.length - 1 });
+                });
+                this._selectRow(Math.max(0, rows.findIndex(node => node.dataset.tabId === selectedID)));
+                if (this._prevFocusClass) this.tabsList.querySelector(`.selected > .${this._prevFocusClass}`)?.focus();
+            };
+            menu.refreshList = refreshWithSession;
+            return () => {
+                if (menu.refreshList === refreshWithSession) menu.refreshList = refreshList;
+            };
+        },
+
+        nativeSessionTab(window, sessionId = null) {
+            const win = this.mainWindow(window);
+            const tabs = win?._zotextractSessionTabs;
+            if (sessionId) return tabs?.get(sessionId) || null;
+            return Array.from(tabs?.values() || []).find(tab => tab.id === win.Zotero_Tabs?.selectedID) || null;
+        },
+
+        sessionWorkspacePanel(window, sessionId) {
+            const win = this.mainWindow(window);
+            const tab = this.nativeSessionTab(win, sessionId);
+            if (tab) return tab.panel;
+            if (win?.Zotero_Tabs?.tabHooks) return null;
+            return win?.document?.getElementById('zotextract-sessions-panel');
+        },
+
+        activeSessionPanel(window) {
+            const win = this.mainWindow(window);
+            return this.nativeSessionTab(win)?.panel || win?.document?.getElementById('zotextract-sessions-panel');
+        },
+
+        sessionPanelIsSelected(window, panel) {
+            const win = this.mainWindow(window);
+            const id = panel?.getAttribute?.('data-ze-native-tab');
+            return id ? win.Zotero_Tabs?.selectedID === id : this.sessionsOverviewIsOpen(win);
+        },
+
+        syncLibrarySessionsVisibility(window) {
+            const win = this.mainWindow(window);
+            const panel = win?.document?.getElementById('zotextract-sessions-panel');
+            if (!panel) return;
+            const librarySelected = !win.Zotero_Tabs || win.Zotero_Tabs.selectedID === 'zotero-pane';
+            panel.style.display = librarySelected && panel.getAttribute('data-ze-open') === 'true' ? 'block' : 'none';
+        },
+
+        installSessionTabHandlers(window) {
+            const win = this.mainWindow(window);
+            const tabs = win?.Zotero_Tabs;
+            if (!tabs || win._zotextractTabCleanup) return;
+            win._zotextractSessionTabs = new Map();
+            let restoreNativeTabs = () => {};
+            if (tabs.tabHooks && tabs.getState) {
+                const getState = tabs.getState;
+                const sessionlessState = function (...args) {
+                    return getState.apply(this, args).filter(tab => tab.type !== 'zotextract');
+                };
+                // Session data is saved by ZotExtract. Do not leave an unknown tab type
+                // in Zotero's startup state when the plugin is disabled or removed.
+                tabs.getState = sessionlessState;
+                const restoreTabMenu = this.installNativeSessionTabMenu(win);
+                restoreNativeTabs = () => {
+                    restoreTabMenu();
+                    if (tabs.getState === sessionlessState) tabs.getState = getState;
+                };
+            }
+            const observer = Zotero.Notifier.registerObserver({ notify: event => {
+                if (event !== 'select') return;
+                this.syncLibrarySessionsVisibility(win);
+                this.positionSessionsPanel(win);
+                const tab = this.nativeSessionTab(win);
+                if (tab) {
+                    this.currentSessionId = tab.sessionId;
+                    this.restoreSessionView(tab.panel);
+                }
+                this.renderLibrarySessionsNav(win);
+                this.scheduleLibrarySessionsPosition(win);
+            } }, ['tab'], 'zotextract-session-tab');
+            win._zotextractTabCleanup = true;
+            this.trackWindowCleanup(win, () => {
+                Zotero.Notifier.unregisterObserver(observer);
+                for (const tab of Array.from(win._zotextractSessionTabs.values())) tabs.close(tab.id);
+                restoreNativeTabs();
+                delete win._zotextractSessionTabs;
+                delete win._zotextractTabCleanup;
+            });
+        },
+
+        ensureNativeSessionsTab(window, session) {
+            const win = this.mainWindow(window);
+            const tabs = win?.Zotero_Tabs;
+            // Older Zotero tab menus require every non-library tab to own a Zotero item.
+            if (!session || !tabs?.tabHooks || !tabs.add || !tabs.getState) return null;
+            this.installSessionTabHandlers(win);
+            const existing = this.nativeSessionTab(win, session.id);
+            if (existing) return existing;
+            const panel = win.document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+            panel.setAttribute('class', 'ze-sessions-panel');
+            panel.setAttribute('data-ze-session-id', session.id);
+            const data = { icon: 'collection', sessionId: session.id };
+            const tab = tabs.add({
+                type: 'zotextract', title: `ZotExtract: ${session.name}`, data, select: false,
+                onClose: () => {
+                    panel.remove();
+                    win._zotextractSessionTabs.delete(session.id);
+                    if (this.currentSessionId === session.id) this.currentSessionId = this.nativeSessionTab(win)?.sessionId || null;
+                    this.renderLibrarySessionsNav(win);
+                }
+            });
+            const entry = { ...tab, data, panel, sessionId: session.id };
+            win._zotextractSessionTabs.set(session.id, entry);
+            tab.container.style.position = 'relative';
+            tab.container.appendChild(panel);
+            panel.setAttribute('data-ze-native-tab', tab.id);
+            panel.style.display = 'block';
+            panel.setAttribute('data-ze-open', 'true');
+            return entry;
+        },
+
+        updateSessionTabTitle(window, session = null) {
+            const win = this.mainWindow(window);
+            const tab = session && this.nativeSessionTab(win, session.id);
+            if (!tab) return;
+            win.Zotero_Tabs.rename(tab.id, `ZotExtract: ${session.name}`);
+            const heading = tab.panel.querySelector('[data-ze-session-name]');
+            if (heading) heading.textContent = session.name;
+        },
+
+        restoreSessionView(panel) {
+            const wrap = panel?.querySelector?.('.ze-matrix-wrap');
+            const scroll = panel?._zotextractScroll;
+            if (wrap && scroll) {
+                wrap.scrollLeft = scroll.left;
+                wrap.scrollTop = scroll.top;
+            }
+        },
+
         xhtmlFragment(html) {
             return String(html)
                 .replace(/\s(data-ze-[a-z0-9-]+)(?=[\s>])/g, ' $1="true"')
@@ -78,15 +272,19 @@ var ZotExtractWindowUI = {
                 stylesheet.setAttribute('id', 'zotextract-style');
                 stylesheet.setAttribute('rel', 'stylesheet');
                 stylesheet.setAttribute('type', 'text/css');
-                stylesheet.setAttribute('href', this.rootURI ? `${this.rootURI}content/zotextract.css` : 'chrome://zotextract/content/zotextract.css');
+                const stylesheetURI = this.rootURI ? `${this.rootURI}content/zotextract.css` : 'chrome://zotextract/content/zotextract.css';
+                // Zotero can retain the previous stylesheet when an extension is updated in place.
+                stylesheet.setAttribute('href', `${stylesheetURI}?load=${Date.now()}`);
                 doc.documentElement.appendChild(stylesheet);
             }
             this.installLibrarySessionsNav(win);
             if (!doc.getElementById('zotextract-sessions-panel')) {
                 const panel = doc.createElementNS('http://www.w3.org/1999/xhtml', 'div');
                 panel.setAttribute('id', 'zotextract-sessions-panel');
+                panel.setAttribute('class', 'ze-sessions-panel');
                 doc.documentElement.appendChild(panel);
             }
+            this.installSessionTabHandlers(win);
             this.positionSessionsPanel(win);
         },
 
@@ -127,7 +325,7 @@ var ZotExtractWindowUI = {
             const doc = win?.document;
             const section = doc?.getElementById('zotextract-library-section');
             if (!section) return;
-            const selected = this.sessionsTabIsOpen(win);
+            const selected = this.sessionsOverviewIsOpen(win);
             const collapsed = this.librarySessionsCollapsed !== false && !selected;
             const filter = this.sessionFilter || 'all';
             const filters = [
@@ -154,7 +352,7 @@ var ZotExtractWindowUI = {
                     this.renderLibrarySessionsNav(win);
                     return;
                 }
-                if (this.sessionsTabIsOpen(win) && (this.sessionFilter || 'all') === 'all') {
+                if (this.sessionsOverviewIsOpen(win) && (this.sessionFilter || 'all') === 'all') {
                     this.closeSessionsTab(win);
                 } else {
                     this.sessionFilter = 'all';
@@ -226,11 +424,15 @@ var ZotExtractWindowUI = {
                     if (!row.getBoundingClientRect) return false;
                     const rect = row.getBoundingClientRect();
                     return rect.width > 20 && rect.height > 8;
-                });
+                })
+                .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
         },
 
         collectionRowIndent(window, row) {
             try {
+                // Zotero 10 indents a nested cell instead of the row itself.
+                const level = Number(row.getAttribute?.('aria-level'));
+                if (Number.isFinite(level) && level > 0) return (level - 1) * 16;
                 const style = window.getComputedStyle?.(row);
                 const value = style?.paddingInlineStart || style?.paddingLeft || row.style?.paddingInlineStart || row.style?.paddingLeft || '0';
                 const parsed = parseFloat(String(value).replace('px', ''));
@@ -251,7 +453,8 @@ var ZotExtractWindowUI = {
             const libraryRow = rows[libraryIndex >= 0 ? libraryIndex : 0];
             if (!libraryRow?.getBoundingClientRect) return null;
             const libraryIndent = this.collectionRowIndent(window, libraryRow);
-            const isOpen = !!libraryRow.querySelector?.('.twisty.open, .icon-css.twisty.open, [class*="twisty"][class*="open"]');
+            const expanded = libraryRow.getAttribute?.('aria-expanded');
+            const isOpen = expanded === 'true' || (expanded == null && !!libraryRow.querySelector?.('.twisty.open, .icon-css.twisty.open, [class*="twisty"][class*="open"]'));
             let anchorRow = libraryRow;
             if (isOpen) {
                 for (let i = (libraryIndex >= 0 ? libraryIndex : 0) + 1; i < rows.length; i++) {
@@ -308,7 +511,7 @@ var ZotExtractWindowUI = {
                 if (section?.contains?.(event.target)) return;
                 const panel = win.document?.getElementById('zotextract-sessions-panel');
                 if (panel?.contains?.(event.target)) return;
-                if (this.sessionsTabIsOpen(win)) {
+                if (this.sessionsOverviewIsOpen(win)) {
                     const close = () => this.closeSessionsTab(win);
                     if (win.setTimeout) win.setTimeout(close, 0);
                     else setTimeout(close, 0);
@@ -332,7 +535,7 @@ var ZotExtractWindowUI = {
             win.addEventListener?.('resize', onResize);
             if (tree && typeof win.MutationObserver === 'function' && !container._zotextractLibraryObserver) {
                 const observer = new win.MutationObserver(() => this.scheduleLibrarySessionsPosition(win));
-                observer.observe(tree, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'aria-expanded'] });
+                observer.observe(tree, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'aria-expanded', 'aria-level'] });
                 container._zotextractLibraryObserver = observer;
             }
             this.trackWindowCleanup(win, () => {
@@ -351,8 +554,14 @@ var ZotExtractWindowUI = {
 
         positionSessionsPanel(window) {
             const win = this.mainWindow(window);
+            if (win?.Zotero_Tabs && win.Zotero_Tabs.selectedID !== 'zotero-pane') return;
             const panel = win?.document?.getElementById('zotextract-sessions-panel');
             if (!panel || !panel.style) return;
+            if (panel.hasAttribute?.('data-ze-native-tab')) {
+                panel.style.left = '0px';
+                panel.style.top = '0px';
+                return;
+            }
             const contentRect = this.zoteroContentPaneRect(win);
             if (contentRect) {
                 panel.style.left = `${Math.round(contentRect.left)}px`;
@@ -609,6 +818,7 @@ var ZotExtractWindowUI = {
                 panel.style.display = 'none';
                 panel.setAttribute('data-ze-open', 'false');
             }
+            this.selectLibraryTab(win);
             this.librarySessionsCollapsed = true;
             this.renderLibrarySessionsNav(win);
         },
@@ -622,14 +832,34 @@ var ZotExtractWindowUI = {
 
         sessionsTabIsOpen(window) {
             const win = this.mainWindow(window);
+            return !!this.nativeSessionTab(win) || this.sessionsOverviewIsOpen(win);
+        },
+
+        sessionsOverviewIsOpen(window) {
+            const win = this.mainWindow(window);
+            if (win?.Zotero_Tabs && win.Zotero_Tabs.selectedID !== 'zotero-pane') return false;
             const panel = win?.document?.getElementById('zotextract-sessions-panel');
             return panel?.getAttribute?.('data-ze-open') === 'true' && panel.style.display !== 'none';
         },
 
-        async openSessionsTab(window, sessionId) {
-            const win = this.selectLibraryTab(window);
+        async openSessionsTab(window, sessionId, options = {}) {
+            const win = this.mainWindow(window);
             if (!win || !win.document) return;
             this.installSessionsUI(win);
+            if (sessionId) {
+                const session = await this.getSession(sessionId);
+                if (!session) return;
+                const existing = this.nativeSessionTab(win, sessionId);
+                const tab = existing || this.ensureNativeSessionsTab(win, session);
+                if (tab) {
+                    this.currentSessionId = sessionId;
+                    win.Zotero_Tabs.select(tab.id);
+                    this.syncLibrarySessionsVisibility(win);
+                    if (!existing || options.refresh) await this.renderSessionWorkspace(sessionId, win);
+                    return;
+                }
+            }
+            this.selectLibraryTab(win);
             const panel = win.document.getElementById('zotextract-sessions-panel');
             if (!panel) return;
             if (!panel.style) return;

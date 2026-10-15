@@ -950,7 +950,7 @@ var ZotExtractProviderRuntime = {
         },
 
         isOpenAIReasoningStyleModel(provider) {
-            return /^(gpt-5|o[34])/.test(this.chatModelKey(provider));
+            return /^(gpt-[56](?:[.\-]|$)|o[34])/.test(this.chatModelKey(provider));
         },
 
         chatMaxTokensParameter(provider) {
@@ -975,6 +975,11 @@ var ZotExtractProviderRuntime = {
             const reasoningEffort = this.normalizeReasoningEffort(provider?.reasoningEffort);
             if (!reasoningEffort) return '';
             const id = this.inferProviderId(provider);
+            const model = this.chatModelKey(provider);
+            if (id === 'openai' && /^gpt-6(?:[.\-]|$)/.test(model)) {
+                if (reasoningEffort === 'minimal') return 'low';
+                if (reasoningEffort === 'none' && /^gpt-(?:6-astra|6\.1-sol)(?:-|$)/.test(model)) return 'low';
+            }
             if (reasoningEffort === 'none') {
                 if (id === 'lm-studio') return 'none';
                 if (id === 'openai' && this.isOpenAIReasoningStyleModel(provider)) return 'none';

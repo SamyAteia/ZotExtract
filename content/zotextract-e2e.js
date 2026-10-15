@@ -60,7 +60,8 @@ var ZotExtractE2E = {
             result.draftSessionId = draftSession.id;
             await ZotExtract.openSessionsTab(win);
             this.assertSessionsListVisible(win, draftSession.id);
-            this.assertSessionsSourceFloatsUnderLibrary(win);
+            result.librarySidebar = await this.assertSessionsSourceFloatsUnderLibrary(win, artifactDir);
+            await ZotExtract.openSessionsTab(win);
             await this.writeStage(artifactDir, 'sessions-list-visible', { sessionId: draftSession.id });
             await this.waitForArtifactFile(artifactDir, 'ui-shell-sessions-list-captured.json', 120);
             await this.assertSessionsTabToggleCloses(win, artifactDir);
@@ -89,7 +90,7 @@ var ZotExtractE2E = {
             await this.ensureQuestionPickerOpen(win, draftSession.id);
             await this.writeStage(artifactDir, 'question-picker-visible', { sessionId: draftSession.id });
             await this.waitForArtifactFile(artifactDir, 'ui-shell-question-picker-captured.json', 120);
-            this.assertQuestionPickerVisible(win);
+            await this.assertQuestionPickerVisible(win);
             await this.returnFromSubview(win);
 
             const addPaperCandidate = items[1] || items[0];
@@ -105,7 +106,7 @@ var ZotExtractE2E = {
 
             const beforeSingleSessions = (await ZotExtract.loadSessions()).map(session => session.id);
             await pane.selectItems([items[0].id]);
-            await this.writeStage(artifactDir, 'single-ready', { itemID: items[0].id });
+            await this.writeStage(artifactDir, 'single-ready', { itemID: items[0].id, contextMenuTarget: await this.selectedItemContextMenuTarget(win) });
             const singleSession = this.directSessionStart()
                 ? await ZotExtract.createSessionFromItems([items[0]])
                 : await this.waitForSessionForItems([items[0].id], beforeSingleSessions);
@@ -129,11 +130,13 @@ var ZotExtractE2E = {
             await this.writeStage(artifactDir, 'evidence-pdf-opened', { sessionId: singleSession.id, itemID: items[0].id, questionId: singleCells[0].questionId });
             await this.waitForArtifactFile(artifactDir, 'ui-shell-evidence-pdf-captured.json', 120);
             result.steps.push('evidence-pdf-covered');
+            result.sessionTabReturn = await this.assertEvidenceTabReturn(win, singleSession.id);
+            ZotExtract.closeSessionsTab(win);
             await this.delay(500);
 
             const beforeMultiSessions = (await ZotExtract.loadSessions()).map(session => session.id);
             await pane.selectItems(items.map(item => item.id));
-            await this.writeStage(artifactDir, 'multi-ready', { itemIDs: items.map(item => item.id) });
+            await this.writeStage(artifactDir, 'multi-ready', { itemIDs: items.map(item => item.id), contextMenuTarget: await this.selectedItemContextMenuTarget(win) });
 
             const multiSession = this.directSessionStart()
                 ? await ZotExtract.createSessionFromItems(items)
@@ -154,6 +157,9 @@ var ZotExtractE2E = {
             result.steps.push('multi-session-completed');
             await this.waitForArtifactFile(artifactDir, 'ui-shell-multi-session-completed-captured.json', 120);
             result.provider = ZotExtract.getProviderSettings();
+            result.modelCompatibility = await this.checkModelCompatibility(result.provider);
+            result.scrolledTabReturn = await this.assertScrolledEvidenceReturn(win, multiSession.id);
+            result.multipleSessionTabs = await this.assertMultipleSessionTabs(win, multiSession.id, artifactDir);
 
             const exportBundle = await ZotExtract.buildSessionExportBundle(multiSession.id);
             const exportPaths = await ZotExtract.writeExportBundle(exportBundle);
@@ -173,6 +179,8 @@ var ZotExtractE2E = {
             }
             await this.writeStage(artifactDir, 'export-created', exportPaths);
             result.steps.push('export-completed');
+            // The shell's Tools-menu uninstall flow uses the library menu layout.
+            ZotExtract.selectLibraryTab(win);
 
             const allAnswers = [...result.singleCells, ...result.multiCells].map(cell => cell.answer || '').join('\n');
             const realProvider = this.realProviderE2E();
@@ -206,6 +214,230 @@ var ZotExtractE2E = {
         }
 
         await IOUtils.writeUTF8(resultPath, JSON.stringify(result, null, 2));
+    },
+
+    async selectedItemContextMenuTarget(win) {
+        await this.delay(150);
+        const tree = win.document.getElementById(win.ZoteroPane.itemsView.id);
+        const rows = Array.from(tree?.querySelectorAll('.row.selected, [role="row"][aria-selected="true"]') || []);
+        const rect = rows.map(row => row.getBoundingClientRect()).find(rect => rect.width > 100 && rect.height > 0);
+        if (!rect) throw new Error('No visible selected item row for the context-menu flow.');
+        const scale = win.devicePixelRatio || 1;
+        return {
+            x: Math.round((win.mozInnerScreenX + rect.left + 80) * scale),
+            y: Math.round((win.mozInnerScreenY + rect.top + rect.height / 2) * scale)
+        };
+    },
+
+    clickNativeTab(win, id) {
+        const tab = Array.from(win.document.querySelectorAll(`#tab-bar-container .tab[data-id="${id}"]`))
+            .find(node => node.getBoundingClientRect().width > 0);
+        if (!tab) throw new Error(`Native tab ${id} is not visible.`);
+        tab.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+        tab.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, button: 0 }));
+        tab.click();
+    },
+
+    async assertEvidenceTabReturn(win, sessionId) {
+        if (!ZotExtract.nativeSessionTab(win, sessionId)) return { supported: false };
+        const id = ZotExtract.nativeSessionTab(win, sessionId).id;
+        const panel = ZotExtract.sessionWorkspacePanel(win, sessionId);
+        const matrix = panel.querySelector('.ze-matrix');
+        if (win.Zotero_Tabs.selectedID === id) throw new Error('PDF evidence did not select its reader tab.');
+        const tab = win.document.querySelector(`#tab-bar-container .tab[data-id="${id}"]`);
+        if (!tab || tab.getBoundingClientRect().width < 20) throw new Error('Session tab disappeared while reading PDF evidence.');
+        this.clickNativeTab(win, id);
+        await this.delay(200);
+        this.assertSessionWorkspaceVisible(win, sessionId);
+        if (panel.querySelector('.ze-matrix') !== matrix) throw new Error('Returning from PDF rebuilt the session grid.');
+        if (!panel.querySelector(`[data-ze-session-id="${sessionId}"]`)) throw new Error('Returned to the wrong session.');
+        return { supported: true, sessionId, sameGrid: true };
+    },
+
+    async assertScrolledEvidenceReturn(win, sessionId) {
+        if (!ZotExtract.nativeSessionTab(win, sessionId)) return { supported: false };
+        const panel = ZotExtract.sessionWorkspacePanel(win, sessionId);
+        const wrap = panel.querySelector('.ze-matrix-wrap');
+        wrap.scrollLeft = Math.min(220, wrap.scrollWidth - wrap.clientWidth);
+        const button = Array.from(panel.querySelectorAll('[data-ze-open-evidence]')).find(node => this.elementVisibleInPanel(node, panel));
+        if (!button) throw new Error('No visible evidence button for tab-return navigation.');
+        await this.delay(200);
+        const before = { left: wrap.scrollLeft, top: wrap.scrollTop };
+        button.click();
+        await this.delay(900);
+        const readerTab = win.Zotero_Tabs.selectedID;
+        if (readerTab === ZotExtract.nativeSessionTab(win, sessionId).id) throw new Error('Evidence click left the session selected.');
+        await ZotExtract.refreshSessionWorkspace(sessionId);
+        await this.delay(300);
+        if (win.Zotero_Tabs.selectedID !== readerTab) throw new Error('Background refresh stole focus from the PDF.');
+        const returned = await this.assertEvidenceTabReturn(win, sessionId);
+        const after = panel.querySelector('.ze-matrix-wrap');
+        if (after.scrollLeft !== before.left || after.scrollTop !== before.top) {
+            throw new Error(`Session scroll changed after PDF review: ${JSON.stringify(before)} -> ${after.scrollLeft},${after.scrollTop}`);
+        }
+        // Opening Zotero's tab menu must also support a session without an item ID.
+        this.clickNativeTab(win, readerTab);
+        win.Zotero_Tabs.showTabsMenu(true);
+        await this.delay(100);
+        const menu = win.Zotero_Tabs.tabsMenuPanel;
+        let menuEntry = menu.querySelector(`[data-tab-id="${ZotExtract.nativeSessionTab(win, sessionId).id}"] .title`);
+        if (!menuEntry || menu.tabsList.children.length !== win.Zotero_Tabs._tabs.length) throw new Error('Zotero tab menu did not render every tab, including the session.');
+        const filter = menu.querySelector('#zotero-tabs-menu-filter');
+        filter.value = 'ZotExtract:';
+        filter.dispatchEvent(new win.Event('input', { bubbles: true }));
+        await this.delay(100);
+        menuEntry = menu.querySelector(`[data-tab-id="${ZotExtract.nativeSessionTab(win, sessionId).id}"] .title`);
+        if (!menuEntry || menu.tabsList.children.length !== win._zotextractSessionTabs.size) throw new Error('Filtering the tab menu did not retain the session row.');
+        menuEntry.click();
+        await this.delay(100);
+        if (win.Zotero_Tabs.selectedID !== ZotExtract.nativeSessionTab(win, sessionId).id) throw new Error('Tab menu did not return to the session.');
+        win.Zotero_Tabs.showTabsMenu(false);
+        const oldId = ZotExtract.nativeSessionTab(win, sessionId).id;
+        win.document.querySelector(`#tab-bar-container .tab[data-id="${oldId}"] .tab-close`).click();
+        await this.delay(200);
+        if (ZotExtract.nativeSessionTab(win, sessionId)) throw new Error('Closing the native session tab did not release its workspace.');
+        this.clickNativeTab(win, 'zotero-pane');
+        if (!ZotExtract.sessionsOverviewIsOpen(win)) win.document.querySelector('#zotextract-library-section [data-ze-sessions-root]').click();
+        await this.delay(300);
+        const overview = win.document.getElementById('zotextract-sessions-panel');
+        overview.querySelector(`[data-ze-session-row="${sessionId}"]`).click();
+        await this.delay(150);
+        overview.querySelector('[data-ze-open-detail]').click();
+        await this.delay(300);
+        this.assertSessionWorkspaceVisible(win, sessionId, { completed: true });
+        if (win.Zotero_Tabs.getState().some(tab => tab.type === 'zotextract')) throw new Error('Ephemeral plugin tab leaked into Zotero restart state.');
+        return { ...returned, scroll: before, backgroundRefreshKeptReader: true, closedAndReopened: true, tabMenuReturn: true };
+    },
+
+    async assertMultipleSessionTabs(win, sessionId, artifactDir) {
+        if (!ZotExtract.nativeSessionTab(win, sessionId)) return { supported: false };
+        const tabs = win.Zotero_Tabs;
+        const primary = ZotExtract.nativeSessionTab(win, sessionId);
+        const overview = win.document.getElementById('zotextract-sessions-panel');
+        const tabCount = () => tabs._tabs.filter(tab => tab.type === 'zotextract').length;
+        const initialCount = tabCount();
+        primary.panel.querySelector('[data-ze-back]').click();
+        await this.delay(250);
+        const filters = ['all', 'draft', 'running', 'completed', 'exported'];
+        for (const filter of filters) {
+            win.document.querySelector(`[data-ze-session-nav-filter="${filter}"]`).click();
+            await this.delay(150);
+            if (!ZotExtract.sessionsOverviewIsOpen(win) || tabs.selectedID !== 'zotero-pane' || tabCount() !== initialCount) {
+                throw new Error(`Overview filter ${filter} opened or replaced a native tab.`);
+            }
+            const sidebar = ZotExtract.libraryNavContainer(win).getBoundingClientRect();
+            if (overview.getBoundingClientRect().left < sidebar.right - 2) throw new Error('Overview covered the library sidebar.');
+        }
+        await this.writeStage(artifactDir, 'session-overview-in-library', { filters, sessionTabCount: initialCount });
+        await this.waitForArtifactFile(artifactDir, 'ui-shell-session-overview-in-library-captured.json', 120);
+        const source = await ZotExtract.getSession(sessionId);
+        const items = await Promise.all(source.paperItemIds.map(id => ZotExtract.getItemById(id)));
+        const secondarySession = await ZotExtract.createSessionFromItems(items.slice(0, -1));
+        await ZotExtract.renameSession(secondarySession.id, 'Parallel session review', win, { render: false });
+        await ZotExtract.addQuestionsToSession(secondarySession.id, source.questionRefs);
+        win.document.querySelector('[data-ze-session-nav-filter="all"]').click();
+        await this.delay(200);
+        overview.querySelector(`[data-ze-session-row="${secondarySession.id}"]`).click();
+        await this.delay(150);
+        overview.querySelector('[data-ze-open-detail]').click();
+        await this.delay(700);
+        const secondary = ZotExtract.nativeSessionTab(win, secondarySession.id);
+        if (!secondary || secondary.panel === primary.panel || tabCount() !== initialCount + 1) throw new Error('Opening another session did not create an independent tab.');
+        await this.ensureAddPapersOpen(win, secondarySession.id);
+        await win.ZoteroPane.selectItems([items[items.length - 1].id]);
+        win.document.getElementById('zotero-itemmenu-zotextract-add-to-session').dispatchEvent(new win.Event('command', { bubbles: true }));
+        for (let attempt = 0; attempt < 40 && !ZotExtract.nativeSessionTab(win); attempt++) await this.delay(100);
+        await this.delay(300);
+        this.assertSessionWorkspaceVisible(win, secondarySession.id, { papers: items.length, questions: source.questionRefs.length });
+        if (tabCount() !== initialCount + 1 || ZotExtract.nativeSessionTab(win)?.id !== secondary.id) throw new Error('Adding a paper did not refresh the existing session tab.');
+        const wrap = secondary.panel.querySelector('.ze-matrix-wrap');
+        wrap.scrollLeft = 110;
+        wrap.scrollTop = 180;
+        await this.delay(100);
+        const secondaryScroll = { left: wrap.scrollLeft, top: wrap.scrollTop };
+        this.clickNativeTab(win, primary.id);
+        await this.delay(100);
+        if (ZotExtract.currentSessionId !== sessionId) throw new Error('Selecting a session tab did not update the active session.');
+        await ZotExtract.refreshSessionWorkspace(secondarySession.id);
+        if (tabs.selectedID !== primary.id || primary.panel.getAttribute('data-ze-workspace-session') !== sessionId) throw new Error('Background session update replaced or selected another session.');
+        this.clickNativeTab(win, secondary.id);
+        await this.delay(100);
+        const updatedWrap = secondary.panel.querySelector('.ze-matrix-wrap');
+        if (updatedWrap.scrollLeft !== secondaryScroll.left || updatedWrap.scrollTop !== secondaryScroll.top) throw new Error('Independent session scroll was lost.');
+        const currentGrid = secondary.panel.querySelector('.ze-matrix');
+        await ZotExtract.openSessionsTab(win, secondarySession.id);
+        if (tabCount() !== initialCount + 1 || secondary.panel.querySelector('.ze-matrix') !== currentGrid) throw new Error('Reopening a session duplicated or rebuilt its tab.');
+        await this.ensureQuestionPickerOpen(win, secondarySession.id);
+        this.clickNativeTab(win, primary.id);
+        await this.delay(100);
+        await ZotExtract.refreshSessionWorkspace(secondarySession.id);
+        this.clickNativeTab(win, secondary.id);
+        await this.delay(100);
+        if (!secondary.panel.querySelector('[data-ze-question-name]')) throw new Error('Switching sessions lost the question picker.');
+        secondary.panel.querySelector('[data-ze-cancel]').click();
+        await this.delay(300);
+        secondary.panel.querySelector('[data-ze-back]').click();
+        await this.delay(200);
+        if (!ZotExtract.sessionsOverviewIsOpen(win) || !ZotExtract.nativeSessionTab(win, secondarySession.id)) throw new Error('Back to sessions closed the session tab or failed to open the library overview.');
+        await ZotExtract.openSessionsTab(win, secondarySession.id);
+        await ZotExtract.openSessionsTab(win, secondarySession.id);
+        this.clickNativeTab(win, 'zotero-pane');
+        await this.delay(150);
+        if (!ZotExtract.sessionsOverviewIsOpen(win) || overview.getBoundingClientRect().left < ZotExtract.libraryNavContainer(win).getBoundingClientRect().right - 2) throw new Error('Returning directly to the library lost the overview layout.');
+        await this.writeStage(artifactDir, 'multiple-session-tabs', { primaryId: sessionId, secondaryId: secondarySession.id, sessionTabCount: tabCount(), secondaryScroll });
+        await this.waitForArtifactFile(artifactDir, 'ui-shell-multiple-session-tabs-captured.json', 120);
+        this.clickNativeTab(win, primary.id);
+        await this.delay(100);
+        const cells = await ZotExtract.readResultCells(sessionId);
+        await ZotExtract.openEvidenceInPdf(cells[0], null, win);
+        await this.delay(300);
+        const readerId = tabs.selectedID;
+        if (readerId === primary.id || overview.style.display !== 'none') throw new Error('Overview obscured the PDF reader.');
+        await ZotExtract.refreshSessionWorkspace(secondarySession.id);
+        if (tabs.selectedID !== readerId) throw new Error('Second session refresh stole PDF focus.');
+        tabs.showTabsMenu(true);
+        await this.delay(100);
+        const menu = tabs.tabsMenuPanel;
+        const search = menu.querySelector('#zotero-tabs-menu-filter');
+        search.value = 'no matching session title';
+        search.dispatchEvent(new win.Event('input', { bubbles: true }));
+        await this.delay(100);
+        if (!menu.querySelector('#zotero-tabs-menu-row-empty')) throw new Error('Empty tab search did not show its normal empty state.');
+        search.value = '';
+        search.dispatchEvent(new win.Event('input', { bubbles: true }));
+        await this.delay(100);
+        for (const tab of [primary, secondary]) {
+            if (!menu.querySelector(`[data-tab-id="${tab.id}"] .title`)) throw new Error('All-tabs menu omitted an open session.');
+        }
+        menu.querySelector(`[data-tab-id="${secondary.id}"] .title`).click();
+        await this.delay(150);
+        if (tabs.selectedID !== secondary.id || ZotExtract.currentSessionId !== secondarySession.id) throw new Error('Tab menu selected the wrong session.');
+        tabs.showTabsMenu(false);
+        win.document.querySelector(`#tab-bar-container .tab[data-id="${secondary.id}"] .tab-close`).click();
+        await this.delay(150);
+        if (ZotExtract.nativeSessionTab(win, secondarySession.id) || !ZotExtract.nativeSessionTab(win, sessionId) || !(await ZotExtract.getSession(secondarySession.id))) throw new Error('Closing one tab affected another session or deleted saved data.');
+        await ZotExtract.openSessionsTab(win, secondarySession.id);
+        await this.delay(150);
+        if (tabCount() !== initialCount + 1) throw new Error('Closed session did not reopen exactly once.');
+        ZotExtract.nativeSessionTab(win, secondarySession.id).panel.querySelector('[data-ze-delete-session]').click();
+        for (let attempt = 0; attempt < 120 && await ZotExtract.getSession(secondarySession.id); attempt++) await this.delay(500);
+        if (await ZotExtract.getSession(secondarySession.id)) throw new Error('Session deletion was not confirmed through the UI.');
+        if (ZotExtract.nativeSessionTab(win, secondarySession.id) || !ZotExtract.nativeSessionTab(win, sessionId)) throw new Error('Deleting a session failed to close only its own tab.');
+        this.clickNativeTab(win, primary.id);
+        return { supported: true, overviewFilters: filters, independentPanels: true, independentScroll: secondaryScroll, addPapersRefreshedExistingTab: true, pickerPreserved: true, duplicateOpenReused: true, pdfFocusPreserved: true, menuIncludesBoth: true, closeAndDeleteIsolated: true };
+    },
+
+    async checkModelCompatibility(provider) {
+        if (this.realProviderE2E() || provider.name !== 'OpenAI') return [];
+        const results = [];
+        for (const model of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'openai/gpt-6-astra', 'gpt-5.4-mini', 'gpt-4o-mini']) {
+            for (const reasoningEffort of ['none', 'minimal', 'medium']) {
+                const answer = await ZotExtract.callWithText({ ...provider, model, reasoningEffort }, 'Summarize the fixture.', 'Local fixture text.');
+                if (!answer) throw new Error(`Empty compatibility response for ${model}/${reasoningEffort}`);
+                results.push({ model, reasoningEffort, ok: true });
+            }
+        }
+        return results;
     },
 
     async runDeterministic() {
@@ -364,7 +596,7 @@ var ZotExtractE2E = {
     },
 
     assertSessionsListVisible(win, sessionId) {
-        const panel = win.document.getElementById('zotextract-sessions-panel');
+        const panel = ZotExtract.activeSessionPanel(win);
         const nav = win.document.getElementById('zotextract-library-section');
         const text = panel?.textContent || '';
         this.assertText(text, [
@@ -389,17 +621,73 @@ var ZotExtractE2E = {
         }
     },
 
-    assertSessionsSourceFloatsUnderLibrary(win) {
+    async assertSessionsSourceFloatsUnderLibrary(win, artifactDir) {
+        const view = win.ZoteroPane.collectionsView;
         const nav = win.document.getElementById('zotextract-library-section');
-        const anchorRect = ZotExtract.librarySessionsAnchorRect?.(win);
-        const navRect = nav?.getBoundingClientRect?.();
-        if (!nav || !anchorRect || !navRect) {
-            throw new Error('Could not inspect ZotExtract left-library placement.');
+        const libraryID = `L${Zotero.Libraries.userLibraryID}`;
+        const parent = new Zotero.Collection();
+        parent.name = 'Sidebar layout parent';
+        await parent.saveTx();
+        const child = new Zotero.Collection();
+        child.name = 'Sidebar layout child';
+        child.parentID = parent.id;
+        await child.saveTx();
+        ZotExtract.closeSessionsTab(win);
+
+        const toggle = async id => {
+            const index = view.getRowIndexByID(id);
+            const row = win.document.getElementById(`${view.id}-row-${index}`);
+            const twisty = row?.querySelector('.twisty');
+            if (!twisty) throw new Error(`No native disclosure control for ${id}.`);
+            twisty.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, button: 0 }));
+            await this.delay(400);
+        };
+        const measure = async state => {
+            const start = view.getRowIndexByID(libraryID);
+            let last = start;
+            while (view.getRow(last + 1)?.level > view.getRow(start).level) last++;
+            const lastRow = win.document.getElementById(`${view.id}-row-${last}`);
+            const libraryRow = win.document.getElementById(`${view.id}-row-${start}`);
+            const navRect = nav?.getBoundingClientRect();
+            const lastRect = lastRow?.getBoundingClientRect();
+            if (!navRect || !lastRect) throw new Error('Could not measure the native library subtree.');
+            const measurement = {
+                state, nativeRows: last - start + 1, lastRow: lastRow.textContent,
+                libraryBottom: lastRect.bottom, sessionsTop: navRect.top,
+                offsetFromLibrary: navRect.top - libraryRow.getBoundingClientRect().top,
+                gap: navRect.top - lastRect.bottom,
+                rows: ZotExtract.visibleCollectionRows(win).map(row => ({
+                    text: row.textContent, level: row.getAttribute('aria-level'),
+                    padding: win.getComputedStyle(row).paddingInlineStart,
+                    bottom: row.getBoundingClientRect().bottom
+                }))
+            };
+            await this.writeStage(artifactDir, `sidebar-${state}`, measurement);
+            await this.waitForArtifactFile(artifactDir, `ui-shell-sidebar-${state}-captured.json`, 120);
+            if (measurement.gap < 0 || measurement.gap > 16) {
+                this.lastUiDiagnostics = measurement;
+                throw new Error(`ZotExtract overlaps or detaches from the ${state} library subtree: gap ${measurement.gap}px.`);
+            }
+            return measurement;
+        };
+
+        if (view.isContainerOpen(view.getRowIndexByID(`C${parent.id}`))) await toggle(`C${parent.id}`);
+        if (view.isContainerOpen(view.getRowIndexByID(libraryID))) await toggle(libraryID);
+        const collapsed = await measure('collapsed');
+        await toggle(libraryID);
+        const expanded = await measure('expanded');
+        await toggle(`C${parent.id}`);
+        const nested = await measure('nested');
+        if (expanded.offsetFromLibrary <= collapsed.offsetFromLibrary || nested.offsetFromLibrary <= expanded.offsetFromLibrary) {
+            throw new Error('Expanding library rows did not move ZotExtract sessions down.');
         }
-        const distance = Math.abs(navRect.top - anchorRect.bottom);
-        if (distance > 16) {
-            throw new Error(`ZotExtract sessions source is not floating under My Library rows. Distance: ${distance}px.`);
+        await toggle(libraryID);
+        const recollapsed = await measure('recollapsed');
+        if (Math.abs(recollapsed.offsetFromLibrary - collapsed.offsetFromLibrary) > 2) {
+            throw new Error('Collapsing My Library did not restore ZotExtract sessions placement.');
         }
+        await toggle(libraryID);
+        return { collapsed, expanded, nested, recollapsed };
     },
 
     async assertLibraryClickReturnsToZotero(win, artifactDir) {
@@ -423,18 +711,22 @@ var ZotExtractE2E = {
     },
 
     async assertTreeRowClickReturnsToZotero(win, artifactDir, pattern, stageName, label) {
-        const panel = win.document.getElementById('zotextract-sessions-panel');
+        const panel = ZotExtract.activeSessionPanel(win);
         const nav = win.document.getElementById('zotextract-library-section');
         const row = this.findCollectionTreeRow(win, pattern);
         if (!panel || !nav || !row) {
             throw new Error(`Could not find the ${label} row for return-navigation coverage.`);
         }
-        if (panel.style.display === 'none' || panel.getAttribute('data-ze-open') !== 'true') {
+        if (!ZotExtract.sessionsTabIsOpen(win)) {
             throw new Error(`ZotExtract Sessions panel was not open before ${label} return assertion.`);
+        }
+        if (ZotExtract.nativeSessionTab(win)) {
+            this.clickNativeTab(win, 'zotero-pane');
+            await this.delay(150);
         }
         row.click();
         await this.delay(350);
-        if (panel.style.display !== 'none' || panel.getAttribute('data-ze-open') === 'true') {
+        if (ZotExtract.sessionsTabIsOpen(win)) {
             this.lastUiDiagnostics = this.describePanel(panel, `${stageName}-did-not-close-sessions`);
             throw new Error(`Clicking ${label} did not return from ZotExtract Sessions to the normal library view.`);
         }
@@ -461,7 +753,7 @@ var ZotExtractE2E = {
         if (tabbar) {
             throw new Error('Obsolete ZotExtract top tabbar is still installed.');
         }
-        const panel = win.document.getElementById('zotextract-sessions-panel');
+        const panel = ZotExtract.activeSessionPanel(win);
         const nav = win.document.getElementById('zotextract-library-section');
         const sessionsRoot = nav?.querySelector('[data-ze-sessions-root]');
         if (!sessionsRoot || !panel) {
@@ -470,12 +762,16 @@ var ZotExtractE2E = {
         if (!/My ZotExtract Sessions/i.test(nav.textContent || '') || !/Drafts/i.test(nav.textContent || '')) {
             throw new Error('ZotExtract left library sessions entry did not render the collapsible session filters.');
         }
-        if (panel.style.display === 'none' || panel.getAttribute('data-ze-open') !== 'true') {
+        if (!ZotExtract.sessionsTabIsOpen(win)) {
             throw new Error('ZotExtract Sessions panel was not open before left-entry close assertion.');
         }
-        sessionsRoot.click();
+        if (ZotExtract.nativeSessionTab(win)) {
+            this.clickNativeTab(win, 'zotero-pane');
+        } else {
+            sessionsRoot.click();
+        }
         await this.delay(250);
-        if (panel.style.display !== 'none' || panel.getAttribute('data-ze-open') === 'true') {
+        if (ZotExtract.sessionsTabIsOpen(win)) {
             this.lastUiDiagnostics = this.describePanel(panel, 'sessions-left-entry-did-not-close');
             throw new Error('Clicking the My ZotExtract Sessions entry did not close the Sessions view.');
         }
@@ -483,7 +779,7 @@ var ZotExtractE2E = {
     },
 
     assertEmptySessionVisible(win) {
-        const panel = win.document.getElementById('zotextract-sessions-panel');
+        const panel = ZotExtract.activeSessionPanel(win);
         const text = panel?.textContent || '';
         this.assertText(text, [
             /ZotExtract Session/i,
@@ -508,18 +804,25 @@ var ZotExtractE2E = {
     },
 
     assertSessionWorkspaceVisible(win, sessionId, expected = {}) {
-        const panel = win.document.getElementById('zotextract-sessions-panel');
-        if (!panel || panel.style.display === 'none' || panel.getAttribute('data-ze-open') !== 'true') {
+        const panel = ZotExtract.activeSessionPanel(win);
+        if (!panel || !ZotExtract.sessionsTabIsOpen(win)) {
             throw new Error(`ZotExtract session workspace ${sessionId} is not visibly open.`);
         }
         const selectedTab = win.Zotero_Tabs?.selectedID;
-        if (selectedTab && selectedTab !== 'zotero-pane') {
+        if (selectedTab && selectedTab !== (ZotExtract.nativeSessionTab(win, sessionId)?.id || 'zotero-pane')) {
             throw new Error(`ZotExtract session workspace opened while Zotero tab ${selectedTab} was active instead of the library tab.`);
         }
         const panelRect = panel.getBoundingClientRect?.();
-        const contentRect = ZotExtract.zoteroContentPaneRect?.(win);
+        const nativeTab = ZotExtract.nativeSessionTab(win, sessionId);
+        const contentRect = nativeTab?.container.getBoundingClientRect() || ZotExtract.zoteroContentPaneRect?.(win);
         if (panelRect && contentRect && Math.abs(panelRect.top - contentRect.top) > 3) {
             throw new Error(`ZotExtract session panel top is not aligned with Zotero content pane. Panel top ${panelRect.top}, content top ${contentRect.top}.`);
+        }
+        if (nativeTab && panelRect) {
+            const deckRect = win.document.getElementById('tabs-deck').getBoundingClientRect();
+            if (Math.abs(panelRect.left - deckRect.left) > 3 || Math.abs(panelRect.right - deckRect.right) > 3) {
+                throw new Error(`ZotExtract session panel does not fill the tab deck. Panel width ${panelRect.width}, deck width ${deckRect.width}.`);
+            }
         }
         const text = panel.textContent || '';
         this.assertText(text, [
@@ -579,7 +882,7 @@ var ZotExtractE2E = {
         }
     },
 
-    assertQuestionPickerVisible(win) {
+    async assertQuestionPickerVisible(win) {
         let modal = this.activeSubview(win);
         const text = modal?.textContent || '';
         this.assertText(text, [
@@ -602,6 +905,10 @@ var ZotExtractE2E = {
             throw new Error('Add extractions view did not render a clickable question row.');
         }
         questionRow.click();
+        for (let i = 0; i < 40; i++) {
+            if (this.activeSubview(win)?.querySelector(`[data-ze-question="${questionId}"] .ze-check.checked`)) break;
+            await this.delay(50);
+        }
         modal = this.activeSubview(win);
         const selectedQuestionRow = modal?.querySelector(`[data-ze-question="${questionId}"]`);
         if (!selectedQuestionRow?.querySelector('.ze-check.checked')) {
@@ -627,8 +934,8 @@ var ZotExtractE2E = {
     },
 
     assertAddPapersVisible(win, sessionId) {
-        const panel = win.document.getElementById('zotextract-sessions-panel');
-        if (panel?.getAttribute?.('data-ze-open') === 'true' && panel.style.display !== 'none') {
+        const panel = ZotExtract.activeSessionPanel(win);
+        if (ZotExtract.sessionsTabIsOpen(win)) {
             throw new Error('Add papers did not return from the ZotExtract session workspace to the Zotero library.');
         }
         if (sessionId && ZotExtract.currentSessionId !== sessionId) {
@@ -644,9 +951,9 @@ var ZotExtractE2E = {
 
     async ensureAddPapersOpen(win, sessionId) {
         const hasAddPapers = () => {
-            const panel = win.document.getElementById('zotextract-sessions-panel');
+            const panel = ZotExtract.activeSessionPanel(win);
             const tip = win.document.getElementById('zotextract-shortcut-tip');
-            return (!panel || panel.getAttribute('data-ze-open') !== 'true' || panel.style.display === 'none')
+            return !ZotExtract.sessionsTabIsOpen(win)
                 && (!sessionId || ZotExtract.currentSessionId === sessionId)
                 && /Add papers to this session/i.test(tip?.textContent || '');
         };
@@ -684,7 +991,7 @@ var ZotExtractE2E = {
     },
 
     activeSubview(win) {
-        return win.document.querySelector('#zotextract-sessions-panel');
+        return ZotExtract.activeSessionPanel(win);
     },
 
     assertElementVisibleInPanel(element, panel, label) {
@@ -976,7 +1283,7 @@ var ZotExtractE2E = {
                 hasMenuItem: !!win.document.getElementById('zotero-itemmenu-zotextract-start'),
                 hasObsoleteTabbar: !!win.document.getElementById('zotextract-main-tabbar'),
                 hasLibrarySessionsEntry: !!win.document.getElementById('zotextract-library-section'),
-                hasPanel: !!win.document.getElementById('zotextract-sessions-panel'),
+                hasPanel: !!ZotExtract.activeSessionPanel(win),
                 hasTip: !!win.document.getElementById('zotextract-install-tip'),
                 documentReadyState: win.document.readyState || null,
                 windowTitle: win.document.title || null

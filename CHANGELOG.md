@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-16
+
+### Added
+
+- Open individual sessions in separate native Zotero 8–10 tabs beside PDFs. Multiple sessions retain independent grids and scroll positions, and reopening a session selects its existing tab. Zotero 7 retains the library-based session view.
+
+### Fixed
+
+- Kept My ZotExtract Sessions below the library's visible collections when expanding or collapsing the sidebar in Zotero 10.
+- Kept session navigation highlights within the sidebar when selecting a status filter or resizing the sidebar.
+- Recognized GPT-6 models when choosing completion-token and temperature parameters. Unsupported `none` and `minimal` reasoning settings use `low` where required.
+- Kept session overviews and status filters in the library. Background extraction updates leave the selected session or PDF reader in place, and adding papers refreshes the correct session tab.
+- Refreshed session styles after in-place extension updates so session tabs fill the available window width without requiring a Zotero restart.
+
 ## [1.0.1] - 2026-10-15
 
 ### Fixed
@@ -62,6 +76,7 @@ Alpha release for early testing.
 - Result notes saved under processed Zotero items.
 - NFDIxCS branding and funding acknowledgement.
 
+[1.1.0]: https://github.com/SamyAteia/ZotExtract/releases/tag/v1.1.0
 [1.0.1]: https://github.com/SamyAteia/ZotExtract/releases/tag/v1.0.1
 [1.0.0]: https://github.com/SamyAteia/ZotExtract/releases/tag/v1.0.0
 [0.1.0-alpha]: https://github.com/SamyAteia/ZotExtract/releases/tag/v0.1.0-alpha

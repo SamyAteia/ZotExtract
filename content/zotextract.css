@@ -17,7 +17,7 @@
 #zotero-collections-pane{position:relative}
 #zotextract-library-section{display:block!important;position:absolute;left:6px;right:6px;z-index:20;width:auto;min-width:0;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ze-text);margin:0;background:var(--ze-bg)}
 #zotextract-library-section .ze-tree-children{display:block;width:100%;min-width:0}
-#zotextract-library-section .ze-tree-row{width:calc(100% - 4px);max-width:calc(100% - 4px);min-height:28px;border-radius:5px;display:flex!important;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden}
+#zotextract-library-section .ze-tree-row{box-sizing:border-box;width:calc(100% - 4px);max-width:calc(100% - 4px);min-height:34px;border-radius:5px;display:flex!important;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden}
 #zotextract-library-section .ze-tree-row:hover{background:transparent}
 #zotextract-library-section .ze-tree-row.selected{background:var(--ze-accent);color:var(--ze-accent-text);font-weight:600}
 #zotextract-library-section .ze-tree-row.child{padding-left:34px;color:var(--ze-text)}
@@ -30,8 +30,8 @@
 #zotextract-library-section .ze-count{margin-left:auto;color:var(--ze-text-muted);font-size:12px;font-weight:500}
 #zotextract-library-section[data-ze-collapsed="true"] .ze-tree-children{display:none}
 /* Sessions panel shell */
-#zotextract-sessions-panel{position:fixed;top:64px;left:233px;right:0;bottom:0;z-index:8999;background:var(--ze-panel);border-top:1px solid var(--ze-border);border-left:1px solid var(--ze-border);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ze-text);display:none;overflow:hidden}
-#zotextract-sessions-panel *{box-sizing:border-box}
+.ze-sessions-panel{position:fixed;top:64px;left:233px;right:0;bottom:0;z-index:8999;background:var(--ze-panel);border-top:1px solid var(--ze-border);border-left:1px solid var(--ze-border);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ze-text);display:none;overflow:hidden}
+.ze-sessions-panel *{box-sizing:border-box}
 .ze-windowbar{height:42px;background:var(--ze-toolbar);border-bottom:1px solid var(--ze-border);display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-weight:700}
 .ze-toolbar{height:52px;border-bottom:1px solid var(--ze-border);display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--ze-toolbar);min-width:0;overflow-x:auto}
 .ze-btn{height:32px;border:1px solid var(--ze-border);background:var(--ze-panel);color:var(--ze-text);border-radius:6px;padding:0 12px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer}
@@ -72,6 +72,7 @@
 .ze-session-heading .ze-inline-name-input{height:32px;font-size:20px;font-weight:700}
 .ze-window-title .ze-inline-name-input{width:min(360px,60vw)}
 /* Session matrix */
+.ze-sessions-panel[data-ze-native-tab]{position:absolute;inset:0}
 .ze-session-body{height:calc(100% - 94px);display:flex;flex-direction:column;min-height:0;background:var(--ze-toolbar);overflow:hidden}
 .ze-matrix-wrap{flex:1 1 auto;min-height:0;min-width:0;width:100%;max-width:100%;overflow:scroll;box-sizing:border-box;padding:14px 14px 24px;scrollbar-gutter:stable both-edges;overscroll-behavior:contain}
 .ze-matrix{display:inline-grid;grid-template-columns:var(--ze-grid-cols);width:max-content;min-width:max-content;border:1px solid var(--ze-border);border-radius:8px;background:var(--ze-panel);overflow:visible}

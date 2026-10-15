@@ -169,6 +169,7 @@ var ZotExtractData = {
             this.resetRuntimeState();
             for (const win of this.windows || []) {
                 try {
+                    for (const tab of Array.from(win._zotextractSessionTabs?.values() || [])) win.Zotero_Tabs.close(tab.id);
                     win.document?.getElementById?.('zotextract-install-tip')?.remove?.();
                     win.document?.getElementById?.('zotextract-shortcut-tip')?.remove?.();
                     const panel = win.document?.getElementById?.('zotextract-sessions-panel');
@@ -544,6 +545,10 @@ var ZotExtractData = {
             }
             await this.saveSessions(sessions.filter(candidate => candidate.id !== session.id));
             await this.deleteResultCells(session.id);
+            for (const win of this.mainLibraryWindows()) {
+                const tab = this.nativeSessionTab(win, session.id);
+                if (tab) win.Zotero_Tabs.close(tab.id);
+            }
             if (this.currentSessionId === session.id) this.currentSessionId = null;
             await this.renderSessionsList(window || this.mainWindow());
             return true;
@@ -555,6 +560,7 @@ var ZotExtractData = {
             const cleanName = String(name || '').trim();
             if (!cleanName) return session;
             session = await this.saveSession({ ...session, name: cleanName });
+            for (const win of this.mainLibraryWindows()) this.updateSessionTabTitle(win, session);
             if (options.render !== false) {
                 const targetWindow = window || this.mainWindow();
                 if (options.surface === 'workspace') await this.renderSessionWorkspace(session.id, targetWindow);
@@ -750,7 +756,7 @@ var ZotExtractData = {
             session.paperItemIds = Array.from(ids);
             if (ids.size > beforeSize) this.markSessionHasPendingWork(session);
             session = await this.saveSession(session);
-            await this.openSessionsTab(null, session.id);
+            await this.openSessionsTab(null, session.id, { refresh: true });
             return session;
         },
 

@@ -144,6 +144,20 @@ const server = http.createServer(async (req, res) => {
     let body = {};
     try { body = JSON.parse(raw || '{}'); } catch {}
 
+    // Reject the same unsupported fields as the hosted GPT-6 chat API.
+    // Log only request settings, never messages or authorization headers.
+    const model = String(body.model || '').replace(/^openai\//, '');
+    let invalid = '';
+    if (/^gpt-6(?:[.\-]|$)/.test(model)) {
+      if ('max_tokens' in body || !body.max_completion_tokens) invalid = 'max_tokens';
+      else if ('temperature' in body && body.reasoning_effort !== 'none') invalid = 'temperature';
+      else if (body.reasoning_effort === 'minimal') invalid = 'reasoning_effort';
+      else if (/^gpt-(?:6-astra|6\.1-sol)(?:-|$)/.test(model) && body.reasoning_effort === 'none') invalid = 'reasoning_effort';
+    }
+    console.log(JSON.stringify({ model: body.model, max_tokens: body.max_tokens, max_completion_tokens: body.max_completion_tokens,
+      temperature: body.temperature, reasoning_effort: body.reasoning_effort, status: invalid ? 400 : 200 }));
+    if (invalid) return json(res, 400, { error: { message: `Unsupported parameter: ${invalid}`, param: invalid, code: 'unsupported_parameter' } });
+
     const user = (body.messages || []).filter(m => m.role === 'user').map(messageText).join('\n');
     const content = buildAssistantContent(user, body.model);
 
